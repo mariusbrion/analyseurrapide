@@ -115,7 +115,7 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.5s ease-in;
-            perspective: 800px; /* Ajout pour la 3D */
+            perspective: 800px; 
         }
 
         #loader.visible {
@@ -123,7 +123,7 @@
             pointer-events: all;
         }
 
-        /* NOUVEAU Loader 3D */
+        /* Loader 3D */
         .cube-loader {
             width: 60px;
             height: 60px;
@@ -152,7 +152,6 @@
             from { transform: rotateX(0deg) rotateY(0deg); }
             to   { transform: rotateX(360deg) rotateY(360deg); }
         }
-        /* Fin du nouveau loader */
 
         #loader p {
             font-size: 1.1rem;
@@ -259,7 +258,6 @@
                 color: '#bbb',
                 weight: 0.7
             },
-            // MODIFIÉ : Ajout des parcs/forêts
             landuse: (feature) => {
                 let color = '#f0f0f0'; // Couleur par défaut (autres)
                 switch (feature.properties.landuse) {
@@ -282,7 +280,6 @@
                     fillOpacity: 0.6
                 };
             }
-            // La couche "building" a été supprimée
         };
 
         // Écouteur d'événement sur le formulaire
@@ -313,7 +310,7 @@
                 mapElement.style.opacity = '1';
 
                 initializeMap(geoData.lat, geoData.lon, geoData.bbox);
-                await drawMapLayers(geojsonData);
+                await drawMapLayers(geojsonData); // C'est ici que l'erreur se produisait
                 
             } catch (error) {
                 // C'est ici que votre erreur s'affichait (ligne ~302)
@@ -358,12 +355,9 @@
             };
         }
 
-        // Étape 3 : Requête Overpass (MODIFIÉE)
+        // Étape 3 : Requête Overpass
         async function getOverpassData(bbox) {
             const bboxString = `(${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]})`;
-
-            // MODIFIÉ : Requête simplifiée, SANS les bâtiments.
-            // Ajout de 'park', 'forest', 'grass'
             const query = `
                 [out:json][timeout:45]; 
                 (
@@ -408,7 +402,7 @@
             }
             
             map = L.map('map', {
-                zoomControl: false, 
+                zoomControl: false, // On le garde à false ici
                 attributionControl: false 
             });
 
@@ -422,11 +416,10 @@
             }).addTo(map);
         }
 
-        // Étape 5.2 : Dessiner les couches en séquence (MODIFIÉ)
+        // Étape 5.2 : Dessiner les couches en séquence
         async function drawMapLayers(geojsonData) {
             const features = geojsonData.features;
 
-            // MODIFIÉ : 'building' supprimé
             const layers = {
                 water: [],
                 road_major: [],
@@ -435,7 +428,6 @@
                 landuse: []
             };
 
-            // MODIFIÉ : 'building' supprimé
             features.forEach(f => {
                 const props = f.properties;
                 if (props.natural === 'water' || props.waterway === 'river') {
@@ -473,7 +465,7 @@
                 });
             };
 
-            // La Séquence de "Dessin" (MODIFIÉE)
+            // La Séquence de "Dessin"
             await addLayer(layers.water, styles.water, 100);
             updateLoaderStatus('Dessin des cours d\'eau...');
 
@@ -486,16 +478,17 @@
             await addLayer(layers.road_minor, styles.road_minor, 600);
             updateLoaderStatus('Finalisation du réseau routier...');
 
-            // L'analyse des zones est maintenant la dernière étape
             await addLayer(layers.landuse, styles.landuse, 800);
             updateLoaderStatus('Identification des zones...');
             
-            // L'étape "building" a été supprimée
-
             updateLoaderStatus('Analyse terminée.');
             
-            // Réactiver le zoom/drag après l'animation
-            map.zoomControl.addTo(map);
+            // --- C'EST LA CORRECTION ---
+            // Au lieu de map.zoomControl.addTo(map)
+            L.control.zoom().addTo(map); // On crée un nouveau contrôle de zoom
+            // ---------------------------
+
+            // Réactiver le drag (le reste était correct)
             map.dragging.enable();
             map.touchZoom.enable();
             map.doubleClickZoom.enable();
