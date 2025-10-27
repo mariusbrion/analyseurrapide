@@ -41,6 +41,7 @@
 </head>
 <body>
 
+    <!-- ... [Tout votre HTML reste identique] ... -->
     <div id="search-container">
         <h1>Analyseur Urbain</h1>
         <p>Visualisez la structure de n'importe quelle ville.</p>
@@ -126,26 +127,15 @@
 
                 updateLoaderStatus('Initialisation de la visualisation...');
                 
-                // NOUVEAU: Créer un objet GeoJSON simple pour la bounding box
-                const bbox = geoData.bbox; // [lat_min, lat_max, lon_min, lon_max]
-                const bboxGeoJSON = {
-                    type: "Polygon",
-                    coordinates: [[
-                        [bbox[2], bbox[0]], // lon_min, lat_min
-                        [bbox[3], bbox[0]], // lon_max, lat_min
-                        [bbox[3], bbox[1]], // lon_max, lat_max
-                        [bbox[2], bbox[1]], // lon_min, lat_max
-                        [bbox[2], bbox[0]]  // lon_min, lat_min (fermeture)
-                    ]]
-                };
+                // === SUPPRESSION DE LA CRÉATION DU BBOXGEOJSON ===
+                // Nous n'en avons plus besoin
 
                 // Cache le loader et affiche le canvas AVANT de dessiner
                 loader.classList.remove('visible');
                 canvasElement.style.opacity = '1';
                 
-                // Initialise et dessine
-                // MODIFIÉ: Passe le nouveau bboxGeoJSON à la fonction
-                initializeCanvas(bboxGeoJSON); 
+                // MODIFIÉ: On passe l'ensemble des données
+                initializeCanvas(geojsonData); 
                 await drawMapLayers(geojsonData);
                 
                 updateLoaderStatus('Analyse terminée.');
@@ -210,42 +200,44 @@
         }
 
 
-        // MODIFIÉ: Accepte 'fitObject' (notre bboxGeoJSON) au lieu de 'geojsonData'
-       function initializeCanvas(fitObject) { 
-            // Nettoie le SVG précédent
+        // === FONCTION initializeCanvas ENTIÈREMENT CORRIGÉE ===
+        function initializeCanvas(geojsonData) { 
             svg = d3.select("#viz-canvas");
             svg.selectAll("*").remove();
 
-            // --- CORRECTION CI-DESSOUS ---
-            // N'utilisez pas clientWidth/clientHeight, qui peuvent être 0
-            // Utilisez la taille de la fenêtre, que le SVG est censé remplir.
+            // 1. Obtenir les dimensions réelles de la fenêtre
             const width = window.innerWidth;
             const height = window.innerHeight;
-            // --- FIN DE LA CORRECTION ---
             
             svg.attr("width", width)
                .attr("height", height);
             
-            // Crée une projection centrée sur la ville
+            // 2. Définir une marge (padding) en pixels
+            const padding = 20;
+
+            // 3. Définir le rectangle "cible" en pixels
+            const extent = [
+                [padding, padding], 
+                [width - padding, height - padding]
+            ];
+            
+            // 4. Créer la projection
             const projection = d3.geoMercator();
             
-            // Ajoute un peu de "padding" (marge) pour que la ville ne touche pas les bords
-            const padding = 20; // 20 pixels de marge
-            
-            // Utilise fitSize pour adapter la projection à notre 'fitObject' (la bbox)
-            projection.fitSize([width - padding * 2, height - padding * 2], fitObject); 
-            
-            // Applique la translation de la marge
-            projection.translate([width / 2, height / 2]);
+            // 5. Demander à D3 d'ajuster la projection
+            // pour que 'geojsonData' tienne dans 'extent'
+            projection.fitExtent(extent, geojsonData);
 
-            // Crée le générateur de chemin
+            // 6. Créer le générateur de chemin avec la projection finale
             pathGenerator = d3.geoPath().projection(projection);
 
+            // 7. Logs de débogage (ceux-ci devraient maintenant être corrects)
             console.log("Canvas initialisé");
             console.log("Projection scale:", projection.scale());
             console.log("Projection center:", projection.center());
             console.log("Projection translate:", projection.translate());
         }
+
         // ... [La fonction drawMapLayers reste identique] ...
         async function drawMapLayers(geojsonData) {
             if (!geojsonData?.features?.length) {
