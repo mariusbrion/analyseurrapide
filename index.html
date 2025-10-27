@@ -41,6 +41,12 @@
             height: 100vh;
             padding: 2rem;
             transition: opacity 0.5s ease-out;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 10;
+            background: white;
         }
 
         #search-container h1 { font-weight: 500; font-size: 2.5rem; margin-bottom: 0.5rem; }
@@ -69,13 +75,15 @@
 
         /* --- Étape 3 : Le Canvas SVG --- */
         #viz-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100vh;
-            background-color: var(--background); /* Le fond blanc */
+            background-color: var(--background);
             z-index: 1;
-            opacity: 0; /* Commence caché */
+            opacity: 0;
             transition: opacity 0.5s ease-in;
-            padding: 1rem; /* Marge intérieure pour ne pas coller aux bords */
         }
         
         /* Style pour les chemins SVG */
@@ -133,20 +141,20 @@
         let svg;
         let pathGenerator;
 
-        // Les styles sont conservés, ils seront utilisés par D3
+        // Styles avec des couleurs plus visibles pour le débogage
         const styles = {
-            water: { color: '#a0c4ff', weight: 0, fillOpacity: 0.8 },
-            road_major: { color: '#333', weight: 2.5 },
-            road_secondary: { color: '#777', weight: 1.5 },
-            road_minor: { color: '#bbb', weight: 0.7 },
+            water: { color: '#2563eb', weight: 0, fillOpacity: 0.8 },
+            road_major: { color: '#1f2937', weight: 2.5 },
+            road_secondary: { color: '#4b5563', weight: 1.5 },
+            road_minor: { color: '#9ca3af', weight: 0.7 },
             landuse: (feature) => {
-                let color = '#f0f0f0';
-                let opacity = 0.6;
+                let color = '#f3f4f6';
+                let opacity = 0.7;
                 switch (feature.properties.landuse) {
-                    case 'residential': color = '#e6f5d0'; break;
-                    case 'commercial': case 'retail': color = '#fbe8d5'; break;
-                    case 'industrial': color = '#e0e0e0'; break;
-                    case 'forest': case 'park': case 'grass': case 'meadow': color = '#d9f0d9'; break;
+                    case 'residential': color = '#dcfce7'; break;
+                    case 'commercial': case 'retail': color = '#fef3c7'; break;
+                    case 'industrial': color = '#e5e7eb'; break;
+                    case 'forest': case 'park': case 'grass': case 'meadow': color = '#bbf7d0'; break;
                 }
                 return { color: color, weight: 0, fillOpacity: opacity };
             }
@@ -251,11 +259,10 @@
             svg = d3.select("#viz-canvas");
             svg.selectAll("*").remove();
 
-            // Récupère les dimensions du SVG
-            const width = canvasElement.clientWidth;
-            const height = canvasElement.clientHeight;
+            // Définit explicitement les dimensions du SVG
+            const width = window.innerWidth;
+            const height = window.innerHeight;
             
-            // Définit les attributs width et height du SVG
             svg.attr("width", width)
                .attr("height", height);
             
@@ -267,6 +274,11 @@
 
             // Crée le générateur de chemin
             pathGenerator = d3.geoPath().projection(projection);
+
+            console.log("Canvas initialisé avec dimensions:", width, "x", height);
+            console.log("Projection scale:", projection.scale());
+            console.log("Projection center:", projection.center());
+            console.log("Projection translate:", projection.translate());
         }
 
         async function drawMapLayers(geojsonData) {
@@ -304,16 +316,18 @@
             console.log("Données triées:", layers);
 
             // Fonction pour ajouter une couche avec délai
-            const addLayer = (data, style, delay) => {
+            const addLayer = (data, style, delay, layerName) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
                         if (data.length === 0) {
+                            console.log(`Aucune donnée pour la couche: ${layerName}`);
                             resolve();
                             return;
                         }
 
                         // Crée un groupe pour cette couche
-                        const group = svg.append("g");
+                        const group = svg.append("g")
+                            .attr("class", `layer-${layerName}`);
 
                         // Dessine les chemins
                         const paths = group.selectAll("path")
@@ -343,21 +357,27 @@
                                  .attr("stroke-linecap", "round");
                         }
                         
-                        console.log(`Couche dessinée: ${data.length} éléments`);
+                        console.log(`Couche dessinée: ${data.length} éléments (${layerName})`);
                         resolve();
                     }, delay);
                 });
             };
 
-            // La séquence de dessin
+            // La séquence de dessin avec des couleurs de débogage temporaires
             try {
-                await addLayer(layers.water, styles.water, 100);
-                await addLayer(layers.landuse, styles.landuse, 800);
-                await addLayer(layers.road_major, styles.road_major, 600);
-                await addLayer(layers.road_secondary, styles.road_secondary, 600);
-                await addLayer(layers.road_minor, styles.road_minor, 600);
+                // Test avec des couleurs très visibles d'abord
+                await addLayer(layers.water, { color: '#2563eb', fillOpacity: 0.8 }, 100, 'water-debug');
+                await addLayer(layers.landuse, { color: '#10b981', fillOpacity: 0.6 }, 800, 'landuse-debug');
+                await addLayer(layers.road_major, { color: '#ef4444', weight: 3 }, 600, 'road_major-debug');
+                await addLayer(layers.road_secondary, { color: '#f59e0b', weight: 2 }, 600, 'road_secondary-debug');
+                await addLayer(layers.road_minor, { color: '#6b7280', weight: 1 }, 600, 'road_minor-debug');
                 
                 updateLoaderStatus('Analyse terminée.');
+                
+                // Vérification dans la console
+                console.log("Toutes les couches ont été dessinées");
+                console.log("Éléments SVG créés:", document.querySelectorAll('#viz-canvas path').length);
+                
             } catch (error) {
                 console.error("Erreur lors du dessin:", error);
             }
