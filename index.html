@@ -116,10 +116,8 @@
 
     <svg id="viz-canvas"></svg>
 
-
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
-
 
     <script>
         // Références DOM
@@ -181,14 +179,16 @@
                 }
 
                 updateLoaderStatus('Initialisation du canvas...');
-                loader.classList.remove('visible');
-                canvasElement.style.opacity = '1';
-
+                
                 // Initialise le SVG et la projection D3
                 initializeCanvas(geojsonData);
                 
                 // Dessine les données
                 await drawMapLayers(geojsonData);
+                
+                // Affiche le canvas et cache le loader
+                canvasElement.style.opacity = '1';
+                loader.classList.remove('visible');
                 
             } catch (error) {
                 console.error('Erreur dans le processus d\'analyse:', error);
@@ -213,10 +213,15 @@
             const data = await response.json();
             if (!data || data.length === 0) throw new Error(`Ville non trouvée : "${cityName}"`);
             const result = data[0];
-            return { bbox: result.boundingbox, lat: parseFloat(result.lat), lon: parseFloat(result.lon) };
+            return { 
+                bbox: result.boundingbox.map(coord => parseFloat(coord)), 
+                lat: parseFloat(result.lat), 
+                lon: parseFloat(result.lon) 
+            };
         }
 
         async function getOverpassData(bbox) {
+            // Convertir la bbox au format attendu par Overpass (sud, ouest, nord, est)
             const bboxString = `(${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]})`;
             const query = `
                 [out:json][timeout:45]; 
@@ -230,20 +235,29 @@
                 out geom; 
             `;
             const url = 'https://overpass-api.de/api/interpreter';
-            const response = await fetch(url, { method: 'POST', body: `data=${encodeURIComponent(query)}` });
+            const response = await fetch(url, { 
+                method: 'POST', 
+                body: `data=${encodeURIComponent(query)}`,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
             if (!response.ok) throw new Error(`L'API Overpass a retourné une erreur (${response.status}).`);
             return await response.json();
         }
 
-        // --- NOUVELLE FONCTION D'INITIALISATION (D3) ---
         function initializeCanvas(geojsonData) {
             // Sélectionne le SVG et nettoie les anciens dessins
             svg = d3.select("#viz-canvas");
             svg.selectAll("*").remove();
 
-            // Récupère les dimensions du SVG (grâce au CSS 100vh/100vw)
-            const width = parseInt(svg.style("width"));
-            const height = parseInt(svg.style("height"));
+            // Récupère les dimensions du SVG
+            const width = canvasElement.clientWidth;
+            const height = canvasElement.clientHeight;
+            
+            // Définit les attributs width et height du SVG
+            svg.attr("width", width)
+               .attr("height", height);
             
             // Crée une projection Mercator
             const projection = d3.geoMercator();
@@ -251,52 +265,71 @@
             // Ajuste la projection pour centrer et zoomer sur nos données
             projection.fitSize([width, height], geojsonData);
 
-            // Crée le générateur de chemin qui convertit le GeoJSON en attribut "d" SVG
+            // Crée le générateur de chemin
             pathGenerator = d3.geoPath().projection(projection);
         }
 
-        // --- FONCTION DE DESSIN MODIFIÉE (D3) ---
         async function drawMapLayers(geojsonData) {
             if (!geojsonData || !geojsonData.features || geojsonData.features.length === 0) {
+                console.error("Aucune donnée à dessiner");
                 return; 
             }
 
-            // Tri des couches (identique à avant)
-            const layers = { water: [], road_major: [], road_secondary: [], road_minor: [], landuse: [] };
+            // Tri des couches
+            const layers = { 
+                water: [], 
+                road_major: [], 
+                road_secondary: [], 
+                road_minor: [], 
+                landuse: [] 
+            };
 
             geojsonData.features.forEach(f => {
                 const props = f.properties;
-                if (props.natural === 'water' || props.waterway === 'river') layers.water.push(f);
-                else if (props.landuse) layers.landuse.push(f); 
-                else if (props.highway) {
-                    if (props.highway.match(/motorway|primary|trunk/)) layers.road_major.push(f);
-                    else if (props.highway.match(/secondary|tertiary/)) layers.road_secondary.push(f);
-                    else layers.road_minor.push(f);
+                if (props.natural === 'water' || props.waterway === 'river') {
+                    layers.water.push(f);
+                } else if (props.landuse) {
+                    layers.landuse.push(f); 
+                } else if (props.highway) {
+                    if (props.highway.match(/motorway|primary|trunk/)) {
+                        layers.road_major.push(f);
+                    } else if (props.highway.match(/secondary|tertiary/)) {
+                        layers.road_secondary.push(f);
+                    } else {
+                        layers.road_minor.push(f);
+                    }
                 }
             });
 
-            // Fonction utilitaire pour ajouter une couche D3 avec délai
+            console.log("Données triées:", layers);
+
+            // Fonction pour ajouter une couche avec délai
             const addLayer = (data, style, delay) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
+                        if (data.length === 0) {
+                            resolve();
+                            return;
+                        }
+
                         // Crée un groupe pour cette couche
                         const group = svg.append("g");
 
-                        // Lie les données et crée un <path> pour chaque feature
+                        // Dessine les chemins
                         const paths = group.selectAll("path")
-                            .data(data) // Note: on utilise 'data' directement
+                            .data(data)
                             .enter()
                             .append("path")
-                            .attr("d", pathGenerator) // Utilise le générateur D3
+                            .attr("d", pathGenerator)
                             .attr("class", "layer-fade-in");
 
-                        // Applique les styles (lignes vs polygones)
+                        // Applique les styles
                         if (typeof style === 'function') {
                             // Style dynamique (pour landuse)
                             paths.attr("fill", d => style(d).color)
                                  .attr("fill-opacity", d => style(d).fillOpacity)
                                  .attr("stroke", "none");
-                        } else if (style.fillOpacity) { 
+                        } else if (style.fillOpacity !== undefined) { 
                             // Polygones (comme 'water')
                             paths.attr("fill", style.color)
                                  .attr("fill-opacity", style.fillOpacity)
@@ -305,26 +338,29 @@
                             // Lignes (comme les routes)
                             paths.attr("fill", "none")
                                  .attr("stroke", style.color)
-                                 .attr("stroke-width", style.weight);
+                                 .attr("stroke-width", style.weight)
+                                 .attr("stroke-linejoin", "round")
+                                 .attr("stroke-linecap", "round");
                         }
                         
+                        console.log(`Couche dessinée: ${data.length} éléments`);
                         resolve();
                     }, delay);
                 });
             };
 
-            // La Séquence de "Dessin"
-            // Note: on passe 'layers.water' (le tableau) et non un objet GeoJSON
-            await addLayer(layers.water, styles.water, 100);
-            await addLayer(layers.road_major, styles.road_major, 800);
-            await addLayer(layers.road_secondary, styles.road_secondary, 600);
-            await addLayer(layers.road_minor, styles.road_minor, 600);
-            await addLayer(layers.landuse, styles.landuse, 800);
-            
-            updateLoaderStatus('Analyse terminée.');
-            
-            // Plus besoin d'activer le zoom/drag de Leaflet
-            // Vous avez maintenant un dessin SVG statique et épuré.
+            // La séquence de dessin
+            try {
+                await addLayer(layers.water, styles.water, 100);
+                await addLayer(layers.landuse, styles.landuse, 800);
+                await addLayer(layers.road_major, styles.road_major, 600);
+                await addLayer(layers.road_secondary, styles.road_secondary, 600);
+                await addLayer(layers.road_minor, styles.road_minor, 600);
+                
+                updateLoaderStatus('Analyse terminée.');
+            } catch (error) {
+                console.error("Erreur lors du dessin:", error);
+            }
         }
     </script>
 </body>
