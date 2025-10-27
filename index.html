@@ -6,54 +6,13 @@
     <title>Analyseur Urbain</title>
 
     <style>
+        /* ... [Tout votre CSS reste identique] ... */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
-
-        :root {
-            --background: #ffffff;
-            --text-primary: #1a1a1a;
-            --text-secondary: #757575;
-            --accent: #007aff;
-            --loader-bg: rgba(26, 26, 26, 0.95);
-        }
-
-        /* Réinitialisation de base */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html, body {
-            height: 100%;
-            width: 100%;
-            font-family: 'Inter', sans-serif;
-            background-color: var(--background);
-            color: var(--text-primary);
-            overflow: hidden; 
-        }
-
-        /* --- Étape 1 : Conteneur de Recherche --- */
-        #search-container {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            padding: 2rem;
-            transition: opacity 0.5s ease-out;
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 10;
-            background: white;
-        }
-
-        #search-container.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-
+        :root { --background: #ffffff; --text-primary: #1a1a1a; --text-secondary: #757575; --accent: #007aff; --loader-bg: rgba(26, 26, 26, 0.95); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; width: 100%; font-family: 'Inter', sans-serif; background-color: var(--background); color: var(--text-primary); overflow: hidden; }
+        #search-container { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; padding: 2rem; transition: opacity 0.5s ease-out; position: absolute; top: 0; left: 0; width: 100%; z-index: 10; background: white; }
+        #search-container.hidden { opacity: 0; pointer-events: none; }
         #search-container h1 { font-weight: 500; font-size: 2.5rem; margin-bottom: 0.5rem; }
         #search-container p { font-weight: 300; font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem; }
         #city-form { width: 100%; max-width: 500px; display: flex; }
@@ -61,8 +20,6 @@
         #city-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1); }
         #city-form button { font-size: 1.2rem; padding: 0.75rem 1.5rem; border: none; background-color: var(--accent); color: white; cursor: pointer; border-radius: 0 8px 8px 0; transition: background-color 0.3s; }
         #city-form button:hover { background-color: #0056b3; }
-
-        /* --- Étape 2 : Animation de Chargement --- */
         #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--loader-bg); color: #f0f0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10000; opacity: 0; pointer-events: none; transition: opacity 0.5s ease-in; perspective: 800px; }
         #loader.visible { opacity: 1; pointer-events: all; }
         .cube-loader { width: 60px; height: 60px; transform-style: preserve-3d; animation: cube-spin 8s infinite linear; margin-bottom: 2.5rem; }
@@ -77,29 +34,9 @@
         #loader p { font-size: 1.1rem; font-weight: 300; }
         #loader-status { font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem; min-height: 1.2rem; }
         #error-message { color: #ff6b6b; margin-top: 1rem; max-width: 400px; text-align: center; }
-
-        /* --- Étape 3 : Le Canvas SVG --- */
-        #viz-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100vh;
-            background-color: var(--background);
-            z-index: 5;
-            opacity: 0;
-            transition: opacity 0.5s ease-in;
-        }
-        
-        /* Style pour les chemins SVG */
-        .layer-fade-in {
-            animation: fadeIn 1.5s ease-out forwards;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
+        #viz-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100vh; background-color: var(--background); z-index: 5; opacity: 0; transition: opacity 0.5s ease-in; }
+        .layer-fade-in { animation: fadeIn 1.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -112,7 +49,6 @@
             <button type="submit">Analyser</button>
         </form>
     </div>
-
     <div id="loader">
         <div class="cube-loader">
             <div class="cube-face face-front"></div>
@@ -126,14 +62,13 @@
         <p id="loader-status">Initialisation...</p>
         <p id="error-message"></p>
     </div>
-
     <svg id="viz-canvas"></svg>
 
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
 
     <script>
-        // Références DOM
+        // ... [Vos références DOM et styles restent identiques] ...
         const searchContainer = document.getElementById('search-container');
         const cityForm = document.getElementById('city-form');
         const cityInput = document.getElementById('city-input');
@@ -141,12 +76,9 @@
         const loaderStatus = document.getElementById('loader-status');
         const errorMessage = document.getElementById('error-message');
         const canvasElement = document.getElementById('viz-canvas');
-
-        // Variables globales pour D3
         let svg;
         let pathGenerator;
         let currentGeoData = null;
-
         const styles = {
             water: { color: '#a0c4ff', weight: 0, fillOpacity: 0.8 },
             road_major: { color: '#333', weight: 1.5 },
@@ -180,7 +112,7 @@
             try {
                 updateLoaderStatus(`Géocodage de "${cityName}"...`);
                 const geoData = await getBoundingBox(cityName);
-                currentGeoData = geoData;
+                currentGeoData = geoData; 
                 
                 updateLoaderStatus('Récupération des données géospatiales...');
                 const overpassData = await getOverpassData(geoData.bbox);
@@ -194,12 +126,26 @@
 
                 updateLoaderStatus('Initialisation de la visualisation...');
                 
+                // NOUVEAU: Créer un objet GeoJSON simple pour la bounding box
+                const bbox = geoData.bbox; // [lat_min, lat_max, lon_min, lon_max]
+                const bboxGeoJSON = {
+                    type: "Polygon",
+                    coordinates: [[
+                        [bbox[2], bbox[0]], // lon_min, lat_min
+                        [bbox[3], bbox[0]], // lon_max, lat_min
+                        [bbox[3], bbox[1]], // lon_max, lat_max
+                        [bbox[2], bbox[1]], // lon_min, lat_max
+                        [bbox[2], bbox[0]]  // lon_min, lat_min (fermeture)
+                    ]]
+                };
+
                 // Cache le loader et affiche le canvas AVANT de dessiner
                 loader.classList.remove('visible');
                 canvasElement.style.opacity = '1';
                 
                 // Initialise et dessine
-                initializeCanvas(geojsonData);
+                // MODIFIÉ: Passe le nouveau bboxGeoJSON à la fonction
+                initializeCanvas(bboxGeoJSON); 
                 await drawMapLayers(geojsonData);
                 
                 updateLoaderStatus('Analyse terminée.');
@@ -208,7 +154,6 @@
                 console.error('Erreur:', error);
                 errorMessage.textContent = `Erreur : ${error.message}. Veuillez réessayer.`;
                 
-                // Réaffiche l'interface de recherche en cas d'erreur
                 setTimeout(() => { 
                     loader.classList.remove('visible');
                     searchContainer.classList.remove('hidden');
@@ -216,10 +161,10 @@
             }
         }
 
+        // ... [Les fonctions updateLoaderStatus, getBoundingBox, getOverpassData restent identiques] ...
         function updateLoaderStatus(message) {
             loaderStatus.textContent = message;
         }
-
         async function getBoundingBox(cityName) {
             const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1`;
             const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
@@ -234,7 +179,6 @@
                 display_name: result.display_name
             };
         }
-
         async function getOverpassData(bbox) {
             const bboxString = `(${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]})`;
             const query = `
@@ -265,7 +209,9 @@
             return await response.json();
         }
 
-        function initializeCanvas(geojsonData) {
+
+        // MODIFIÉ: Accepte 'fitObject' (notre bboxGeoJSON) au lieu de 'geojsonData'
+        function initializeCanvas(fitObject) { 
             // Nettoie le SVG précédent
             svg = d3.select("#viz-canvas");
             svg.selectAll("*").remove();
@@ -280,8 +226,9 @@
             // Crée une projection centrée sur la ville
             const projection = d3.geoMercator();
             
-            // Utilise fitSize pour adapter la projection aux données
-            projection.fitSize([width, height], geojsonData);
+            // MODIFIÉ: Utilise fitSize pour adapter la projection à notre 'fitObject' (la bbox)
+            // C'est la correction principale
+            projection.fitSize([width, height], fitObject); 
 
             // Crée le générateur de chemin
             pathGenerator = d3.geoPath().projection(projection);
@@ -292,13 +239,12 @@
             console.log("Projection translate:", projection.translate());
         }
 
+        // ... [La fonction drawMapLayers reste identique] ...
         async function drawMapLayers(geojsonData) {
             if (!geojsonData?.features?.length) {
                 console.error("Aucune donnée à dessiner");
                 return; 
             }
-
-            // Tri des couches
             const layers = { 
                 water: [], 
                 road_major: [], 
@@ -306,7 +252,6 @@
                 road_minor: [], 
                 landuse: [] 
             };
-
             geojsonData.features.forEach(f => {
                 const props = f.properties;
                 if (props.natural === 'water' || props.waterway === 'river') {
@@ -323,7 +268,6 @@
                     }
                 }
             });
-
             console.log("Données triées:", {
                 water: layers.water.length,
                 landuse: layers.landuse.length,
@@ -331,8 +275,6 @@
                 road_secondary: layers.road_secondary.length,
                 road_minor: layers.road_minor.length
             });
-
-            // Fonction pour dessiner une couche avec animation
             const drawLayer = (data, style, delay, name) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
@@ -341,18 +283,14 @@
                             resolve();
                             return;
                         }
-
                         const group = svg.append("g")
                             .attr("class", `layer-${name}`);
-
                         const paths = group.selectAll("path")
                             .data(data)
                             .enter()
                             .append("path")
                             .attr("d", pathGenerator)
                             .attr("class", "layer-fade-in");
-
-                        // Applique les styles
                         if (typeof style === 'function') {
                             paths.attr("fill", d => style(d).color)
                                  .attr("fill-opacity", d => style(d).fillOpacity)
@@ -368,32 +306,24 @@
                                  .attr("stroke-linejoin", "round")
                                  .attr("stroke-linecap", "round");
                         }
-
                         console.log(`Dessiné: ${data.length} ${name}`);
                         resolve();
                     }, delay);
                 });
             };
-
-            // Séquence de dessin avec animation
             try {
-                // Commence par l'eau et les zones (arrière-plan)
                 await drawLayer(layers.water, styles.water, 100, 'water');
                 await drawLayer(layers.landuse, styles.landuse, 400, 'landuse');
-                
-                // Puis les routes (avant-plan)
                 await drawLayer(layers.road_minor, styles.road_minor, 700, 'road_minor');
                 await drawLayer(layers.road_secondary, styles.road_secondary, 1000, 'road_secondary');
                 await drawLayer(layers.road_major, styles.road_major, 1300, 'road_major');
-                
                 console.log("Visualisation terminée - éléments SVG:", svg.selectAll("path").size());
-                
             } catch (error) {
                 console.error("Erreur lors du dessin:", error);
             }
         }
 
-        // Optionnel: Ajouter un bouton pour revenir à la recherche
+        // ... [La fonction addBackButton reste identique] ...
         function addBackButton() {
             const backButton = document.createElement('button');
             backButton.textContent = 'Nouvelle recherche';
@@ -411,14 +341,11 @@
             backButton.addEventListener('click', () => {
                 canvasElement.style.opacity = '0';
                 searchContainer.classList.remove('hidden');
-                // Nettoie le SVG
                 if (svg) svg.selectAll("*").remove();
             });
             
             document.body.appendChild(backButton);
         }
-
-        // Initialise le bouton de retour
         addBackButton();
     </script>
 </body>
