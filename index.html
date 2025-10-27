@@ -33,7 +33,7 @@
             font-family: 'Inter', sans-serif;
             background-color: var(--background);
             color: var(--text-primary);
-            overflow: hidden; /* Empêche le défilement */
+            overflow: hidden; 
         }
 
         /* --- Étape 1 : Conteneur de Recherche --- */
@@ -115,6 +115,7 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.5s ease-in;
+            perspective: 800px; /* Ajout pour la 3D */
         }
 
         #loader.visible {
@@ -122,20 +123,36 @@
             pointer-events: all;
         }
 
-        /* Animation "technique" (spinner) */
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid #f0f0f0;
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 1.5rem;
+        /* NOUVEAU Loader 3D */
+        .cube-loader {
+            width: 60px;
+            height: 60px;
+            transform-style: preserve-3d;
+            animation: cube-spin 8s infinite linear;
+            margin-bottom: 2.5rem;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .cube-face {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border: 1px solid var(--accent);
+            background: rgba(0, 122, 255, 0.1);
+            box-shadow: 0 0 15px var(--accent), inset 0 0 10px rgba(0, 122, 255, 0.2);
         }
+
+        .face-front  { transform: rotateY(0deg) translateZ(30px); }
+        .face-back   { transform: rotateY(180deg) translateZ(30px); }
+        .face-left   { transform: rotateY(-90deg) translateZ(30px); }
+        .face-right  { transform: rotateY(90deg) translateZ(30px); }
+        .face-top    { transform: rotateX(90deg) translateZ(30px); }
+        .face-bottom { transform: rotateX(-90deg) translateZ(30px); }
+
+        @keyframes cube-spin {
+            from { transform: rotateX(0deg) rotateY(0deg); }
+            to   { transform: rotateX(360deg) rotateY(360deg); }
+        }
+        /* Fin du nouveau loader */
 
         #loader p {
             font-size: 1.1rem;
@@ -146,7 +163,7 @@
             font-size: 0.9rem;
             color: var(--text-secondary);
             margin-top: 0.5rem;
-            min-height: 1.2rem; /* Évite le saut de layout */
+            min-height: 1.2rem; 
         }
         
         #error-message {
@@ -166,9 +183,7 @@
             transition: opacity 0.5s ease-in;
         }
 
-        /* Classe pour animer l'apparition des couches GeoJSON */
         .layer-fade-in {
-            /* Leaflet utilise SVG, on peut animer l'opacité */
             animation: fadeIn 1.5s ease-out forwards;
         }
 
@@ -191,7 +206,14 @@
     </div>
 
     <div id="loader">
-        <div class="spinner"></div>
+        <div class="cube-loader">
+            <div class="cube-face face-front"></div>
+            <div class="cube-face face-back"></div>
+            <div class="cube-face face-left"></div>
+            <div class="cube-face face-right"></div>
+            <div class="cube-face face-top"></div>
+            <div class="cube-face face-bottom"></div>
+        </div>
         <p>Analyse en cours...</p>
         <p id="loader-status">Initialisation...</p>
         <p id="error-message"></p>
@@ -221,42 +243,46 @@
         // Définition des styles pour les couches
         const styles = {
             water: {
-                color: '#a0c4ff',       // Bleu clair
-                weight: 0,              // Pas de bordure
+                color: '#a0c4ff',
+                weight: 0,
                 fillOpacity: 0.8
             },
             road_major: {
-                color: '#333',          // Gris foncé
+                color: '#333',
                 weight: 2.5
             },
             road_secondary: {
-                color: '#777',          // Gris moyen
+                color: '#777',
                 weight: 1.5
             },
             road_minor: {
-                color: '#bbb',          // Gris clair
+                color: '#bbb',
                 weight: 0.7
             },
-            // Style dynamique pour les zones
+            // MODIFIÉ : Ajout des parcs/forêts
             landuse: (feature) => {
                 let color = '#f0f0f0'; // Couleur par défaut (autres)
                 switch (feature.properties.landuse) {
-                    case 'residential': color = '#e6f5d0'; break; // Vert pâle
-                    case 'commercial':  color = '#fbe8d5'; break; // Orange pâle
-                    case 'industrial':  color = '#e0e0e0'; break; // Gris
-                    case 'retail':      color = '#fbe8d5'; break; // Identique à commercial
+                    case 'residential': 
+                        color = '#e6f5d0'; break; // Vert pâle
+                    case 'commercial':  
+                    case 'retail':      
+                        color = '#fbe8d5'; break; // Orange pâle
+                    case 'industrial':  
+                        color = '#e0e0e0'; break; // Gris
+                    case 'forest':
+                    case 'park':
+                    case 'grass':
+                    case 'meadow':
+                        color = '#d9f0d9'; break; // Vert nature
                 }
                 return {
                     color: color,
                     weight: 0,
                     fillOpacity: 0.6
                 };
-            },
-            building: {
-                color: '#555',          // Gris très foncé
-                weight: 0.5,
-                fillOpacity: 0.4
             }
+            // La couche "building" a été supprimée
         };
 
         // Écouteur d'événement sur le formulaire
@@ -267,43 +293,34 @@
             const cityName = cityInput.value.trim();
             if (!cityName) return;
 
-            // 1. Afficher le loader et cacher la recherche
             loader.classList.add('visible');
             searchContainer.style.opacity = '0';
             searchContainer.style.pointerEvents = 'none';
-            errorMessage.textContent = ''; // Vider les erreurs précédentes
+            errorMessage.textContent = ''; 
 
             try {
-                // 2. Géocodage : Obtenir la "Bounding Box" de la ville
                 updateLoaderStatus(`Géocodage de "${cityName}"...`);
                 const geoData = await getBoundingBox(cityName);
                 
-                // 3. API Overpass : Récupérer les données OSM
                 updateLoaderStatus('Récupération des données géospatiales...');
                 const overpassData = await getOverpassData(geoData.bbox);
 
-                // 4. Conversion des données
                 updateLoaderStatus('Conversion des données (osmtogeojson)...');
                 const geojsonData = osmtogeojson(overpassData);
 
-                // 5. Initialisation et dessin
                 updateLoaderStatus('Initialisation de la carte...');
-                // Cacher le loader et montrer la carte
                 loader.classList.remove('visible');
                 mapElement.style.opacity = '1';
 
                 initializeMap(geoData.lat, geoData.lon, geoData.bbox);
                 await drawMapLayers(geojsonData);
                 
-                // (Optionnel) Ré-afficher une barre de recherche
-                // On peut laisser la carte en plein écran pour l'aspect "analyse"
-
             } catch (error) {
+                // C'est ici que votre erreur s'affichait (ligne ~302)
                 console.error('Erreur dans le processus d\'analyse:', error);
-                errorMessage.textContent = `Erreur : ${error.message}. Veuillez réessayer.`;
-                // Laisser le loader visible pour montrer l'erreur
-                // On pourrait ajouter un bouton "Réessayer"
-                setTimeout(() => { // Cacher le loader et ré-afficher la recherche
+                errorMessage.textContent = `Erreur : ${error.message}. La zone est peut-être trop grande ou l'API a échoué. Veuillez réessayer.`;
+                
+                setTimeout(() => { 
                     loader.classList.remove('visible');
                     searchContainer.style.opacity = '1';
                     searchContainer.style.pointerEvents = 'all';
@@ -334,7 +351,6 @@
             }
 
             const result = data[0];
-            // Bbox Nominatim: [lat_min, lat_max, lon_min, lon_max]
             return {
                 bbox: result.boundingbox,
                 lat: parseFloat(result.lat),
@@ -342,39 +358,34 @@
             };
         }
 
-        // Étape 3 : Requête Overpass
+        // Étape 3 : Requête Overpass (MODIFIÉE)
         async function getOverpassData(bbox) {
-            // Format Overpass: (lat_min, lon_min, lat_max, lon_max)
             const bboxString = `(${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]})`;
 
+            // MODIFIÉ : Requête simplifiée, SANS les bâtiments.
+            // Ajout de 'park', 'forest', 'grass'
             const query = `
-                [out:json][timeout:60];
+                [out:json][timeout:45]; 
                 (
-                    // 1. Eau (Fleuves, rivières, lacs)
+                    // 1. Eau
                     (
                         way["natural"="water"]${bboxString};
                         relation["natural"="water"]${bboxString};
                         way["waterway"="river"]${bboxString};
-                        relation["waterway"="river"]${bboxString};
                     );
                     
-                    // 2. Routes (par catégories)
+                    // 2. Routes
                     way["highway"~"motorway|primary|trunk"]${bboxString};
                     way["highway"~"secondary|tertiary"]${bboxString};
                     way["highway"~"residential|unclassified|service"]${bboxString};
                     
                     // 3. Zones (Landuse)
                     (
-                        way["landuse"~"residential|commercial|industrial|retail"]${bboxString};
-                        relation["landuse"~"residential|commercial|industrial|retail"]${bboxString};
+                        way["landuse"~"residential|commercial|industrial|retail|park|forest|grass|meadow"]${bboxString};
+                        relation["landuse"~"residential|commercial|industrial|retail|park|forest|grass|meadow"]${bboxString};
                     );
-                    
-                    // 4. Bâtiments (Tous. ATTENTION: peut être très lourd !)
-                    way["building"]${bboxString};
-                    relation["building"]${bboxString};
                 );
                 out geom; 
-                // 'out geom;' est crucial pour obtenir les géométries complètes
             `;
 
             const url = 'https://overpass-api.de/api/interpreter';
@@ -392,49 +403,45 @@
 
         // Étape 5.1 : Initialiser la carte
         function initializeMap(lat, lon, bbox) {
-            if (map) { // Supprimer l'ancienne carte si elle existe
+            if (map) { 
                 map.remove();
             }
             
             map = L.map('map', {
-                zoomControl: false, // Épuré : pas de boutons +/-, on zoome à la molette
-                attributionControl: false // Épuré : pas d'attribution
+                zoomControl: false, 
+                attributionControl: false 
             });
 
-            // On calibre la vue sur la bounding box de la ville
-            // Format Leaflet: [[lat_min, lon_min], [lat_max, lon_max]]
             map.fitBounds([
                 [bbox[0], bbox[2]], // Sud-Ouest
                 [bbox[1], bbox[3]]  // Nord-Est
             ]);
 
-            // (Optionnel) Ajouter une attribution discrète
             L.control.attribution({
                 prefix: 'Données &copy; OpenStreetMap'
             }).addTo(map);
         }
 
-        // Étape 5.2 : Dessiner les couches en séquence
+        // Étape 5.2 : Dessiner les couches en séquence (MODIFIÉ)
         async function drawMapLayers(geojsonData) {
             const features = geojsonData.features;
 
-            // On trie les "features" dans des calques séparés
+            // MODIFIÉ : 'building' supprimé
             const layers = {
                 water: [],
                 road_major: [],
                 road_secondary: [],
                 road_minor: [],
-                landuse: [],
-                building: []
+                landuse: []
             };
 
+            // MODIFIÉ : 'building' supprimé
             features.forEach(f => {
                 const props = f.properties;
-                // Important : L'ordre des 'if' détermine la priorité
                 if (props.natural === 'water' || props.waterway === 'river') {
                     layers.water.push(f);
                 } else if (props.landuse) {
-                    layers.landuse.push(f); // Les zones d'abord
+                    layers.landuse.push(f); 
                 } else if (props.highway) {
                     if (props.highway.match(/motorway|primary|trunk/)) {
                         layers.road_major.push(f);
@@ -443,8 +450,6 @@
                     } else {
                         layers.road_minor.push(f);
                     }
-                } else if (props.building) {
-                    layers.building.push(f);
                 }
             });
 
@@ -455,7 +460,6 @@
                         L.geoJSON(data, {
                             style: style,
                             onEachFeature: (feature, layer) => {
-                                // Appliquer la classe CSS pour l'animation de fade-in
                                 layer.on('add', () => {
                                     const element = layer.getElement();
                                     if (element) {
@@ -469,9 +473,9 @@
                 });
             };
 
-            // La Séquence de "Dessin"
+            // La Séquence de "Dessin" (MODIFIÉE)
             await addLayer(layers.water, styles.water, 100);
-            updateLoaderStatus('Dessin des cours d\'eau...'); // (Le loader est caché, mais on garde la logique)
+            updateLoaderStatus('Dessin des cours d\'eau...');
 
             await addLayer(layers.road_major, styles.road_major, 800);
             updateLoaderStatus('Tracé des axes majeurs...');
@@ -482,13 +486,12 @@
             await addLayer(layers.road_minor, styles.road_minor, 600);
             updateLoaderStatus('Finalisation du réseau routier...');
 
+            // L'analyse des zones est maintenant la dernière étape
             await addLayer(layers.landuse, styles.landuse, 800);
             updateLoaderStatus('Identification des zones...');
             
-            await addLayer(layers.building, styles.building, 1000);
-            updateLoaderStatus('Analyse du bâti...');
+            // L'étape "building" a été supprimée
 
-            // Analyse terminée
             updateLoaderStatus('Analyse terminée.');
             
             // Réactiver le zoom/drag après l'animation
