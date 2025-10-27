@@ -49,6 +49,11 @@
             background: white;
         }
 
+        #search-container.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         #search-container h1 { font-weight: 500; font-size: 2.5rem; margin-bottom: 0.5rem; }
         #search-container p { font-weight: 300; font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem; }
         #city-form { width: 100%; max-width: 500px; display: flex; }
@@ -81,7 +86,7 @@
             width: 100%;
             height: 100vh;
             background-color: var(--background);
-            z-index: 1;
+            z-index: 5;
             opacity: 0;
             transition: opacity 0.5s ease-in;
         }
@@ -140,21 +145,22 @@
         // Variables globales pour D3
         let svg;
         let pathGenerator;
+        let currentGeoData = null;
 
-        // Styles avec des couleurs plus visibles pour le débogage
         const styles = {
-            water: { color: '#2563eb', weight: 0, fillOpacity: 0.8 },
-            road_major: { color: '#1f2937', weight: 2.5 },
-            road_secondary: { color: '#4b5563', weight: 1.5 },
-            road_minor: { color: '#9ca3af', weight: 0.7 },
+            water: { color: '#a0c4ff', weight: 0, fillOpacity: 0.8 },
+            road_major: { color: '#333', weight: 1.5 },
+            road_secondary: { color: '#666', weight: 1 },
+            road_minor: { color: '#999', weight: 0.5 },
             landuse: (feature) => {
-                let color = '#f3f4f6';
+                let color = '#f8f9fa';
                 let opacity = 0.7;
                 switch (feature.properties.landuse) {
-                    case 'residential': color = '#dcfce7'; break;
-                    case 'commercial': case 'retail': color = '#fef3c7'; break;
-                    case 'industrial': color = '#e5e7eb'; break;
-                    case 'forest': case 'park': case 'grass': case 'meadow': color = '#bbf7d0'; break;
+                    case 'residential': color = '#e8f5e8'; break;
+                    case 'commercial': case 'retail': color = '#fff3cd'; break;
+                    case 'industrial': color = '#e9ecef'; break;
+                    case 'forest': case 'park': case 'grass': case 'meadow': color = '#d1edff'; break;
+                    default: color = '#f8f9fa';
                 }
                 return { color: color, weight: 0, fillOpacity: opacity };
             }
@@ -168,45 +174,45 @@
             if (!cityName) return;
 
             loader.classList.add('visible');
-            searchContainer.style.opacity = '0';
-            searchContainer.style.pointerEvents = 'none';
-            errorMessage.textContent = ''; 
+            searchContainer.classList.add('hidden');
+            errorMessage.textContent = '';
 
             try {
                 updateLoaderStatus(`Géocodage de "${cityName}"...`);
                 const geoData = await getBoundingBox(cityName);
+                currentGeoData = geoData;
                 
                 updateLoaderStatus('Récupération des données géospatiales...');
                 const overpassData = await getOverpassData(geoData.bbox);
 
-                updateLoaderStatus('Conversion des données (osmtogeojson)...');
+                updateLoaderStatus('Conversion des données...');
                 const geojsonData = osmtogeojson(overpassData);
 
                 if (!geojsonData.features || geojsonData.features.length === 0) {
                     throw new Error("Aucune donnée géographique n'a été trouvée pour cette zone.");
                 }
 
-                updateLoaderStatus('Initialisation du canvas...');
+                updateLoaderStatus('Initialisation de la visualisation...');
                 
-                // Initialise le SVG et la projection D3
+                // Cache le loader et affiche le canvas AVANT de dessiner
+                loader.classList.remove('visible');
+                canvasElement.style.opacity = '1';
+                
+                // Initialise et dessine
                 initializeCanvas(geojsonData);
-                
-                // Dessine les données
                 await drawMapLayers(geojsonData);
                 
-                // Affiche le canvas et cache le loader
-                canvasElement.style.opacity = '1';
-                loader.classList.remove('visible');
+                updateLoaderStatus('Analyse terminée.');
                 
             } catch (error) {
-                console.error('Erreur dans le processus d\'analyse:', error);
+                console.error('Erreur:', error);
                 errorMessage.textContent = `Erreur : ${error.message}. Veuillez réessayer.`;
                 
+                // Réaffiche l'interface de recherche en cas d'erreur
                 setTimeout(() => { 
                     loader.classList.remove('visible');
-                    searchContainer.style.opacity = '1';
-                    searchContainer.style.pointerEvents = 'all';
-                }, 4000);
+                    searchContainer.classList.remove('hidden');
+                }, 3000);
             }
         }
 
@@ -217,30 +223,35 @@
         async function getBoundingBox(cityName) {
             const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1`;
             const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-            if (!response.ok) throw new Error('Le service de géocodage (Nominatim) a échoué.');
+            if (!response.ok) throw new Error('Le service de géocodage a échoué.');
             const data = await response.json();
             if (!data || data.length === 0) throw new Error(`Ville non trouvée : "${cityName}"`);
             const result = data[0];
             return { 
                 bbox: result.boundingbox.map(coord => parseFloat(coord)), 
                 lat: parseFloat(result.lat), 
-                lon: parseFloat(result.lon) 
+                lon: parseFloat(result.lon),
+                display_name: result.display_name
             };
         }
 
         async function getOverpassData(bbox) {
-            // Convertir la bbox au format attendu par Overpass (sud, ouest, nord, est)
             const bboxString = `(${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]})`;
             const query = `
-                [out:json][timeout:45]; 
+                [out:json][timeout:45];
                 (
-                    ( way["natural"="water"]${bboxString}; relation["natural"="water"]${bboxString}; way["waterway"="river"]${bboxString}; );
-                    way["highway"~"motorway|primary|trunk"]${bboxString};
+                    way["natural"="water"]${bboxString};
+                    relation["natural"="water"]${bboxString};
+                    way["waterway"="river"]${bboxString};
+                    way["highway"~"motorway|trunk|primary"]${bboxString};
                     way["highway"~"secondary|tertiary"]${bboxString};
-                    way["highway"~"residential|unclassified|service"]${bboxString};
-                    ( way["landuse"~"residential|commercial|industrial|retail|park|forest|grass|meadow"]${bboxString}; relation["landuse"~"residential|commercial|industrial|retail|park|forest|grass|meadow"]${bboxString}; );
+                    way["highway"~"residential|unclassified|service|living_street"]${bboxString};
+                    way["landuse"~"residential|commercial|industrial|retail"]${bboxString};
+                    relation["landuse"~"residential|commercial|industrial|retail"]${bboxString};
+                    way["landuse"~"forest|park|grass|meadow"]${bboxString};
+                    relation["landuse"~"forest|park|grass|meadow"]${bboxString};
                 );
-                out geom; 
+                out geom;
             `;
             const url = 'https://overpass-api.de/api/interpreter';
             const response = await fetch(url, { 
@@ -255,34 +266,34 @@
         }
 
         function initializeCanvas(geojsonData) {
-            // Sélectionne le SVG et nettoie les anciens dessins
+            // Nettoie le SVG précédent
             svg = d3.select("#viz-canvas");
             svg.selectAll("*").remove();
 
-            // Définit explicitement les dimensions du SVG
-            const width = window.innerWidth;
-            const height = window.innerHeight;
+            // Dimensions
+            const width = canvasElement.clientWidth;
+            const height = canvasElement.clientHeight;
             
             svg.attr("width", width)
                .attr("height", height);
             
-            // Crée une projection Mercator
+            // Crée une projection centrée sur la ville
             const projection = d3.geoMercator();
             
-            // Ajuste la projection pour centrer et zoomer sur nos données
+            // Utilise fitSize pour adapter la projection aux données
             projection.fitSize([width, height], geojsonData);
 
             // Crée le générateur de chemin
             pathGenerator = d3.geoPath().projection(projection);
 
-            console.log("Canvas initialisé avec dimensions:", width, "x", height);
+            console.log("Canvas initialisé");
             console.log("Projection scale:", projection.scale());
             console.log("Projection center:", projection.center());
             console.log("Projection translate:", projection.translate());
         }
 
         async function drawMapLayers(geojsonData) {
-            if (!geojsonData || !geojsonData.features || geojsonData.features.length === 0) {
+            if (!geojsonData?.features?.length) {
                 console.error("Aucune donnée à dessiner");
                 return; 
             }
@@ -303,7 +314,7 @@
                 } else if (props.landuse) {
                     layers.landuse.push(f); 
                 } else if (props.highway) {
-                    if (props.highway.match(/motorway|primary|trunk/)) {
+                    if (props.highway.match(/motorway|trunk|primary/)) {
                         layers.road_major.push(f);
                     } else if (props.highway.match(/secondary|tertiary/)) {
                         layers.road_secondary.push(f);
@@ -313,23 +324,27 @@
                 }
             });
 
-            console.log("Données triées:", layers);
+            console.log("Données triées:", {
+                water: layers.water.length,
+                landuse: layers.landuse.length,
+                road_major: layers.road_major.length,
+                road_secondary: layers.road_secondary.length,
+                road_minor: layers.road_minor.length
+            });
 
-            // Fonction pour ajouter une couche avec délai
-            const addLayer = (data, style, delay, layerName) => {
+            // Fonction pour dessiner une couche avec animation
+            const drawLayer = (data, style, delay, name) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
-                        if (data.length === 0) {
-                            console.log(`Aucune donnée pour la couche: ${layerName}`);
+                        if (!data.length) {
+                            console.log(`Aucune donnée pour ${name}`);
                             resolve();
                             return;
                         }
 
-                        // Crée un groupe pour cette couche
                         const group = svg.append("g")
-                            .attr("class", `layer-${layerName}`);
+                            .attr("class", `layer-${name}`);
 
-                        // Dessine les chemins
                         const paths = group.selectAll("path")
                             .data(data)
                             .enter()
@@ -339,49 +354,72 @@
 
                         // Applique les styles
                         if (typeof style === 'function') {
-                            // Style dynamique (pour landuse)
                             paths.attr("fill", d => style(d).color)
                                  .attr("fill-opacity", d => style(d).fillOpacity)
                                  .attr("stroke", "none");
-                        } else if (style.fillOpacity !== undefined) { 
-                            // Polygones (comme 'water')
+                        } else if (style.fillOpacity !== undefined) {
                             paths.attr("fill", style.color)
                                  .attr("fill-opacity", style.fillOpacity)
                                  .attr("stroke", "none");
                         } else {
-                            // Lignes (comme les routes)
                             paths.attr("fill", "none")
                                  .attr("stroke", style.color)
                                  .attr("stroke-width", style.weight)
                                  .attr("stroke-linejoin", "round")
                                  .attr("stroke-linecap", "round");
                         }
-                        
-                        console.log(`Couche dessinée: ${data.length} éléments (${layerName})`);
+
+                        console.log(`Dessiné: ${data.length} ${name}`);
                         resolve();
                     }, delay);
                 });
             };
 
-            // La séquence de dessin avec des couleurs de débogage temporaires
+            // Séquence de dessin avec animation
             try {
-                // Test avec des couleurs très visibles d'abord
-                await addLayer(layers.water, { color: '#2563eb', fillOpacity: 0.8 }, 100, 'water-debug');
-                await addLayer(layers.landuse, { color: '#10b981', fillOpacity: 0.6 }, 800, 'landuse-debug');
-                await addLayer(layers.road_major, { color: '#ef4444', weight: 3 }, 600, 'road_major-debug');
-                await addLayer(layers.road_secondary, { color: '#f59e0b', weight: 2 }, 600, 'road_secondary-debug');
-                await addLayer(layers.road_minor, { color: '#6b7280', weight: 1 }, 600, 'road_minor-debug');
+                // Commence par l'eau et les zones (arrière-plan)
+                await drawLayer(layers.water, styles.water, 100, 'water');
+                await drawLayer(layers.landuse, styles.landuse, 400, 'landuse');
                 
-                updateLoaderStatus('Analyse terminée.');
+                // Puis les routes (avant-plan)
+                await drawLayer(layers.road_minor, styles.road_minor, 700, 'road_minor');
+                await drawLayer(layers.road_secondary, styles.road_secondary, 1000, 'road_secondary');
+                await drawLayer(layers.road_major, styles.road_major, 1300, 'road_major');
                 
-                // Vérification dans la console
-                console.log("Toutes les couches ont été dessinées");
-                console.log("Éléments SVG créés:", document.querySelectorAll('#viz-canvas path').length);
+                console.log("Visualisation terminée - éléments SVG:", svg.selectAll("path").size());
                 
             } catch (error) {
                 console.error("Erreur lors du dessin:", error);
             }
         }
+
+        // Optionnel: Ajouter un bouton pour revenir à la recherche
+        function addBackButton() {
+            const backButton = document.createElement('button');
+            backButton.textContent = 'Nouvelle recherche';
+            backButton.style.position = 'fixed';
+            backButton.style.top = '20px';
+            backButton.style.right = '20px';
+            backButton.style.zIndex = '20';
+            backButton.style.padding = '10px 20px';
+            backButton.style.backgroundColor = 'var(--accent)';
+            backButton.style.color = 'white';
+            backButton.style.border = 'none';
+            backButton.style.borderRadius = '5px';
+            backButton.style.cursor = 'pointer';
+            
+            backButton.addEventListener('click', () => {
+                canvasElement.style.opacity = '0';
+                searchContainer.classList.remove('hidden');
+                // Nettoie le SVG
+                if (svg) svg.selectAll("*").remove();
+            });
+            
+            document.body.appendChild(backButton);
+        }
+
+        // Initialise le bouton de retour
+        addBackButton();
     </script>
 </body>
 </html>
