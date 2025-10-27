@@ -5,10 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analyseur Urbain</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin="" />
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
 
@@ -20,8 +16,13 @@
             --loader-bg: rgba(26, 26, 26, 0.95);
         }
 
-        /* ... [Le reste de votre CSS reste identique] ... */
-        
+        /* Réinitialisation de base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         html, body {
             height: 100%;
             width: 100%;
@@ -66,14 +67,26 @@
         #loader-status { font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem; min-height: 1.2rem; }
         #error-message { color: #ff6b6b; margin-top: 1rem; max-width: 400px; text-align: center; }
 
-        /* --- Étape 3 : La Carte --- */
-        #map { width: 100%; height: 100vh; background-color: #f8f8f8; /* MODIFIÉ: Fond légèrement gris pour voir si le div s'affiche */ z-index: 1; opacity: 0; transition: opacity 0.5s ease-in; }
-        .layer-fade-in { animation: fadeIn 1.5s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* NOUVEAU: Style pour le fond de carte de diagnostic */
-        .carto-light-tile { filter: grayscale(100%) brightness(1.1) contrast(0.9); }
+        /* --- Étape 3 : Le Canvas SVG --- */
+        #viz-canvas {
+            width: 100%;
+            height: 100vh;
+            background-color: var(--background); /* Le fond blanc */
+            z-index: 1;
+            opacity: 0; /* Commence caché */
+            transition: opacity 0.5s ease-in;
+            padding: 1rem; /* Marge intérieure pour ne pas coller aux bords */
+        }
         
+        /* Style pour les chemins SVG */
+        .layer-fade-in {
+            animation: fadeIn 1.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -101,12 +114,12 @@
         <p id="error-message"></p>
     </div>
 
-    <div id="map"></div>
+    <svg id="viz-canvas"></svg>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
+
 
     <script>
         // Références DOM
@@ -116,11 +129,13 @@
         const loader = document.getElementById('loader');
         const loaderStatus = document.getElementById('loader-status');
         const errorMessage = document.getElementById('error-message');
-        const mapElement = document.getElementById('map');
+        const canvasElement = document.getElementById('viz-canvas');
 
-        let map; // Variable globale
+        // Variables globales pour D3
+        let svg;
+        let pathGenerator;
 
-        // Styles des couches
+        // Les styles sont conservés, ils seront utilisés par D3
         const styles = {
             water: { color: '#a0c4ff', weight: 0, fillOpacity: 0.8 },
             road_major: { color: '#333', weight: 2.5 },
@@ -128,13 +143,14 @@
             road_minor: { color: '#bbb', weight: 0.7 },
             landuse: (feature) => {
                 let color = '#f0f0f0';
+                let opacity = 0.6;
                 switch (feature.properties.landuse) {
                     case 'residential': color = '#e6f5d0'; break;
                     case 'commercial': case 'retail': color = '#fbe8d5'; break;
                     case 'industrial': color = '#e0e0e0'; break;
                     case 'forest': case 'park': case 'grass': case 'meadow': color = '#d9f0d9'; break;
                 }
-                return { color: color, weight: 0, fillOpacity: 0.6 };
+                return { color: color, weight: 0, fillOpacity: opacity };
             }
         };
 
@@ -160,22 +176,23 @@
                 updateLoaderStatus('Conversion des données (osmtogeojson)...');
                 const geojsonData = osmtogeojson(overpassData);
 
-                // NOUVEAU (DIAGNOSTIC n°2): Vérifions les données
-                console.log('Données GeoJSON converties:', geojsonData);
                 if (!geojsonData.features || geojsonData.features.length === 0) {
-                    console.warn("Avertissement: La requête Overpass n'a retourné aucune donnée (features).");
+                    throw new Error("Aucune donnée géographique n'a été trouvée pour cette zone.");
                 }
 
-                updateLoaderStatus('Initialisation de la carte...');
+                updateLoaderStatus('Initialisation du canvas...');
                 loader.classList.remove('visible');
-                mapElement.style.opacity = '1';
+                canvasElement.style.opacity = '1';
 
-                initializeMap(geoData.lat, geoData.lon, geoData.bbox);
+                // Initialise le SVG et la projection D3
+                initializeCanvas(geojsonData);
+                
+                // Dessine les données
                 await drawMapLayers(geojsonData);
                 
             } catch (error) {
                 console.error('Erreur dans le processus d\'analyse:', error);
-                errorMessage.textContent = `Erreur : ${error.message}. La zone est peut-être trop grande ou l'API a échoué. Veuillez réessayer.`;
+                errorMessage.textContent = `Erreur : ${error.message}. Veuillez réessayer.`;
                 
                 setTimeout(() => { 
                     loader.classList.remove('visible');
@@ -218,47 +235,33 @@
             return await response.json();
         }
 
-        // --- FONCTION MODIFIÉE ---
-        function initializeMap(lat, lon, bbox) {
-            if (map) { 
-                map.remove();
-            }
+        // --- NOUVELLE FONCTION D'INITIALISATION (D3) ---
+        function initializeCanvas(geojsonData) {
+            // Sélectionne le SVG et nettoie les anciens dessins
+            svg = d3.select("#viz-canvas");
+            svg.selectAll("*").remove();
+
+            // Récupère les dimensions du SVG (grâce au CSS 100vh/100vw)
+            const width = parseInt(svg.style("width"));
+            const height = parseInt(svg.style("height"));
             
-            map = L.map('map', {
-                zoomControl: false, 
-                attributionControl: false 
-            });
+            // Crée une projection Mercator
+            const projection = d3.geoMercator();
+            
+            // Ajuste la projection pour centrer et zoomer sur nos données
+            projection.fitSize([width, height], geojsonData);
 
-            // NOUVEAU (DIAGNOSTIC n°1): Ajout d'un fond de carte épuré
-            // Cela nous permet de voir si la carte elle-même se charge.
-            // Si vous préférez un fond blanc pur, commentez cette ligne.
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-                maxZoom: 19,
-                className: 'carto-light-tile' // Classe CSS pour le style (voir CSS)
-            }).addTo(map);
-
-            map.fitBounds([
-                [bbox[0], bbox[2]], // Sud-Ouest
-                [bbox[1], bbox[3]]  // Nord-Est
-            ]);
-
-            L.control.attribution({ prefix: 'Données &copy; OpenStreetMap' }).addTo(map);
-
-            // NOUVEAU (LA CORRECTION n°1): Force Leaflet à recalculer sa taille
-            // Doit être appelé APRÈS que le conteneur soit visible.
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 100); // Un léger délai pour assurer que le DOM est à jour
+            // Crée le générateur de chemin qui convertit le GeoJSON en attribut "d" SVG
+            pathGenerator = d3.geoPath().projection(projection);
         }
 
-        // --- FONCTION (LÉGÈREMENT MODIFIÉE) ---
+        // --- FONCTION DE DESSIN MODIFIÉE (D3) ---
         async function drawMapLayers(geojsonData) {
-            // Si aucune donnée n'est renvoyée, ne rien faire
             if (!geojsonData || !geojsonData.features || geojsonData.features.length === 0) {
-                return; // Quitte la fonction
+                return; 
             }
 
+            // Tri des couches (identique à avant)
             const layers = { water: [], road_major: [], road_secondary: [], road_minor: [], landuse: [] };
 
             geojsonData.features.forEach(f => {
@@ -272,24 +275,46 @@
                 }
             });
 
+            // Fonction utilitaire pour ajouter une couche D3 avec délai
             const addLayer = (data, style, delay) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
-                        L.geoJSON(data, {
-                            style: style,
-                            onEachFeature: (feature, layer) => {
-                                layer.on('add', () => {
-                                    const element = layer.getElement();
-                                    if (element) element.classList.add('layer-fade-in');
-                                });
-                            }
-                        }).addTo(map);
+                        // Crée un groupe pour cette couche
+                        const group = svg.append("g");
+
+                        // Lie les données et crée un <path> pour chaque feature
+                        const paths = group.selectAll("path")
+                            .data(data) // Note: on utilise 'data' directement
+                            .enter()
+                            .append("path")
+                            .attr("d", pathGenerator) // Utilise le générateur D3
+                            .attr("class", "layer-fade-in");
+
+                        // Applique les styles (lignes vs polygones)
+                        if (typeof style === 'function') {
+                            // Style dynamique (pour landuse)
+                            paths.attr("fill", d => style(d).color)
+                                 .attr("fill-opacity", d => style(d).fillOpacity)
+                                 .attr("stroke", "none");
+                        } else if (style.fillOpacity) { 
+                            // Polygones (comme 'water')
+                            paths.attr("fill", style.color)
+                                 .attr("fill-opacity", style.fillOpacity)
+                                 .attr("stroke", "none");
+                        } else {
+                            // Lignes (comme les routes)
+                            paths.attr("fill", "none")
+                                 .attr("stroke", style.color)
+                                 .attr("stroke-width", style.weight);
+                        }
+                        
                         resolve();
                     }, delay);
                 });
             };
 
-            // Séquence de dessin
+            // La Séquence de "Dessin"
+            // Note: on passe 'layers.water' (le tableau) et non un objet GeoJSON
             await addLayer(layers.water, styles.water, 100);
             await addLayer(layers.road_major, styles.road_major, 800);
             await addLayer(layers.road_secondary, styles.road_secondary, 600);
@@ -298,12 +323,8 @@
             
             updateLoaderStatus('Analyse terminée.');
             
-            // Réactivation des contrôles
-            L.control.zoom().addTo(map); 
-            map.dragging.enable();
-            map.touchZoom.enable();
-            map.doubleClickZoom.enable();
-            map.scrollWheelZoom.enable();
+            // Plus besoin d'activer le zoom/drag de Leaflet
+            // Vous avez maintenant un dessin SVG statique et épuré.
         }
     </script>
 </body>
