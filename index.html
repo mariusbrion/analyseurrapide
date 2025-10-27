@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analyseur Urbain</title>
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin="" />
+
     <style>
-        /* ... [Tout votre CSS reste identique] ... */
+        /* ... [Le CSS de base reste identique] ... */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
         :root { --background: #ffffff; --text-primary: #1a1a1a; --text-secondary: #757575; --accent: #007aff; --loader-bg: rgba(26, 26, 26, 0.95); }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,19 +38,40 @@
         #loader p { font-size: 1.1rem; font-weight: 300; }
         #loader-status { font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem; min-height: 1.2rem; }
         #error-message { color: #ff6b6b; margin-top: 1rem; max-width: 400px; text-align: center; }
-        #viz-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100vh; background-color: var(--background); z-index: 5; opacity: 0; transition: opacity 0.5s ease-in; }
-        .layer-fade-in { animation: fadeIn 1.5s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        #viz-canvas { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100vh; 
+            background-color: var(--background); 
+            z-index: 5; 
+            opacity: 0; 
+            transition: opacity 0.5s ease-in; 
+        }
+        
+        .layer-fade-in {
+            animation: fadeIn 1s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .road-draw-animation {
+            transition: stroke-dashoffset 2s ease-out;
+        }
+
     </style>
 </head>
 <body>
 
-    <!-- ... [Tout votre HTML reste identique] ... -->
     <div id="search-container">
         <h1>Analyseur Urbain</h1>
         <p>Visualisez la structure de n'importe quelle ville.</p>
         <form id="city-form">
-            <input type="text" id="city-input" placeholder="Ex: Marseille, France" autocomplete="off">
+            <input type="text" id="city-input" placeholder="Ex: Guéret, France (petite ville)" autocomplete="off">
             <button type="submit">Analyser</button>
         </form>
     </div>
@@ -63,13 +88,14 @@
         <p id="loader-status">Initialisation...</p>
         <p id="error-message"></p>
     </div>
-    <svg id="viz-canvas"></svg>
+    <div id="viz-canvas"></div>
 
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
     <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
 
     <script>
-        // ... [Vos références DOM et styles restent identiques] ...
         const searchContainer = document.getElementById('search-container');
         const cityForm = document.getElementById('city-form');
         const cityInput = document.getElementById('city-input');
@@ -77,25 +103,49 @@
         const loaderStatus = document.getElementById('loader-status');
         const errorMessage = document.getElementById('error-message');
         const canvasElement = document.getElementById('viz-canvas');
-        let svg;
-        let pathGenerator;
+
+        let map;
         let currentGeoData = null;
+
         const styles = {
-            water: { color: '#a0c4ff', weight: 0, fillOpacity: 0.8 },
-            road_major: { color: '#333', weight: 1.5 },
-            road_secondary: { color: '#666', weight: 1 },
-            road_minor: { color: '#999', weight: 0.5 },
+            water: { 
+                fillColor: '#a0c4ff', 
+                weight: 0, 
+                fillOpacity: 0.8 
+            },
+            // NOUVEAU: Style pour les bâtiments
+            building: {
+                fillColor: '#4a4a4a', // Gris foncé
+                weight: 0.5,
+                fillOpacity: 0.5,
+                color: '#333' // Couleur de bordure légère
+            },
+            road_major: { 
+                color: '#333', 
+                weight: 1.5 
+            },
+            road_secondary: { 
+                color: '#666', 
+                weight: 1 
+            },
+            road_minor: { 
+                color: '#999', 
+                weight: 0.5 
+            },
             landuse: (feature) => {
                 let color = '#f8f9fa';
-                let opacity = 0.7;
                 switch (feature.properties.landuse) {
-                    case 'residential': color = '#e8f5e8'; break;
-                    case 'commercial': case 'retail': color = '#fff3cd'; break;
-                    case 'industrial': color = '#e9ecef'; break;
+                    case 'residential': color = '#e8f5e8'; break; // Résidentiel
+                    case 'commercial': case 'retail': color = '#fff3cd'; break; // Commercial
+                    case 'industrial': color = '#e9ecef'; break; // Industriel
                     case 'forest': case 'park': case 'grass': case 'meadow': color = '#d1edff'; break;
                     default: color = '#f8f9fa';
                 }
-                return { color: color, weight: 0, fillOpacity: opacity };
+                return { 
+                    fillColor: color, 
+                    weight: 0, 
+                    fillOpacity: 0.7 
+                };
             }
         };
 
@@ -115,7 +165,7 @@
                 const geoData = await getBoundingBox(cityName);
                 currentGeoData = geoData; 
                 
-                updateLoaderStatus('Récupération des données géospatiales...');
+                updateLoaderStatus('Récupération des données géospatiales (cela peut être long)...');
                 const overpassData = await getOverpassData(geoData.bbox);
 
                 updateLoaderStatus('Conversion des données...');
@@ -127,31 +177,25 @@
 
                 updateLoaderStatus('Initialisation de la visualisation...');
                 
-                // === SUPPRESSION DE LA CRÉATION DU BBOXGEOJSON ===
-                // Nous n'en avons plus besoin
-
-                // Cache le loader et affiche le canvas AVANT de dessiner
                 loader.classList.remove('visible');
                 canvasElement.style.opacity = '1';
                 
-                // MODIFIÉ: On passe l'ensemble des données
-                initializeCanvas(geojsonData); 
+                initializeMap(geoData.bbox); 
                 await drawMapLayers(geojsonData);
                 
                 updateLoaderStatus('Analyse terminée.');
                 
             } catch (error) {
                 console.error('Erreur:', error);
-                errorMessage.textContent = `Erreur : ${error.message}. Veuillez réessayer.`;
+                errorMessage.textContent = `Erreur : ${error.message}. La requête est peut-être trop lourde pour cette ville. Veuillez réessayer avec une ville plus petite.`;
                 
                 setTimeout(() => { 
                     loader.classList.remove('visible');
                     searchContainer.classList.remove('hidden');
-                }, 3000);
+                }, 4000); // Augmentation du délai pour lire l'erreur
             }
         }
 
-        // ... [Les fonctions updateLoaderStatus, getBoundingBox, getOverpassData restent identiques] ...
         function updateLoaderStatus(message) {
             loaderStatus.textContent = message;
         }
@@ -163,27 +207,34 @@
             if (!data || data.length === 0) throw new Error(`Ville non trouvée : "${cityName}"`);
             const result = data[0];
             return { 
-                bbox: result.boundingbox.map(coord => parseFloat(coord)), 
+                bbox: result.boundingbox.map(coord => parseFloat(coord)), // [lat_min, lat_max, lon_min, lon_max]
                 lat: parseFloat(result.lat), 
                 lon: parseFloat(result.lon),
                 display_name: result.display_name
             };
         }
+        
+        // MODIFIÉ: Ajout des bâtiments
         async function getOverpassData(bbox) {
             const bboxString = `(${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]})`;
             const query = `
-                [out:json][timeout:45];
+                [out:json][timeout:90]; 
                 (
                     way["natural"="water"]${bboxString};
                     relation["natural"="water"]${bboxString};
                     way["waterway"="river"]${bboxString};
+                    
                     way["highway"~"motorway|trunk|primary"]${bboxString};
                     way["highway"~"secondary|tertiary"]${bboxString};
                     way["highway"~"residential|unclassified|service|living_street"]${bboxString};
+                    
                     way["landuse"~"residential|commercial|industrial|retail"]${bboxString};
                     relation["landuse"~"residential|commercial|industrial|retail"]${bboxString};
                     way["landuse"~"forest|park|grass|meadow"]${bboxString};
                     relation["landuse"~"forest|park|grass|meadow"]${bboxString};
+
+                    way["building"]${bboxString};
+                    relation["building"]${bboxString};
                 );
                 out geom;
             `;
@@ -191,89 +242,81 @@
             const response = await fetch(url, { 
                 method: 'POST', 
                 body: `data=${encodeURIComponent(query)}`,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
-            if (!response.ok) throw new Error(`L'API Overpass a retourné une erreur (${response.status}).`);
+            if (!response.ok) throw new Error(`L'API Overpass a retourné une erreur (${response.status}). La zone est probablement trop grande.`);
             return await response.json();
         }
 
+        function initializeMap(bbox) { 
+            if (map) {
+                map.remove();
+            }
 
-        // === FONCTION initializeCanvas ENTIÈREMENT CORRIGÉE ===
-        function initializeCanvas(geojsonData) { 
-            svg = d3.select("#viz-canvas");
-            svg.selectAll("*").remove();
+            map = L.map('viz-canvas', {
+                zoomControl: false, 
+                attributionControl: false
+            });
 
-            // 1. Obtenir les dimensions réelles de la fenêtre
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            
-            svg.attr("width", width)
-               .attr("height", height);
-            
-            // 2. Définir une marge (padding) en pixels
-            const padding = 20;
-
-            // 3. Définir le rectangle "cible" en pixels
-            const extent = [
-                [padding, padding], 
-                [width - padding, height - padding]
+            const bounds = [
+                [bbox[0], bbox[2]], // Sud-Ouest
+                [bbox[1], bbox[3]]  // Nord-Est
             ];
             
-            // 4. Créer la projection
-            const projection = d3.geoMercator();
-            
-            // 5. Demander à D3 d'ajuster la projection
-            // pour que 'geojsonData' tienne dans 'extent'
-            projection.fitExtent(extent, geojsonData);
+            map.fitBounds(bounds);
 
-            // 6. Créer le générateur de chemin avec la projection finale
-            pathGenerator = d3.geoPath().projection(projection);
+            setTimeout(() => map.invalidateSize(), 100);
 
-            // 7. Logs de débogage (ceux-ci devraient maintenant être corrects)
-            console.log("Canvas initialisé");
-            console.log("Projection scale:", projection.scale());
-            console.log("Projection center:", projection.center());
-            console.log("Projection translate:", projection.translate());
+            console.log("Carte Leaflet initialisée");
         }
 
-        // ... [La fonction drawMapLayers reste identique] ...
+        // MODIFIÉ: Ajout des bâtiments
         async function drawMapLayers(geojsonData) {
             if (!geojsonData?.features?.length) {
                 console.error("Aucune donnée à dessiner");
                 return; 
             }
+            
             const layers = { 
                 water: [], 
+                landuse: [], 
+                building: [], // Ajouté
                 road_major: [], 
                 road_secondary: [], 
-                road_minor: [], 
-                landuse: [] 
+                road_minor: []
             };
+            
             geojsonData.features.forEach(f => {
                 const props = f.properties;
-                if (props.natural === 'water' || props.waterway === 'river') {
-                    layers.water.push(f);
-                } else if (props.landuse) {
-                    layers.landuse.push(f); 
-                } else if (props.highway) {
-                    if (props.highway.match(/motorway|trunk|primary/)) {
-                        layers.road_major.push(f);
-                    } else if (props.highway.match(/secondary|tertiary/)) {
-                        layers.road_secondary.push(f);
-                    } else {
-                        layers.road_minor.push(f);
-                    }
+                // Ordre de priorité: si c'est une route, c'est une route.
+                if (props.highway) {
+                    if (props.highway.match(/motorway|trunk|primary/)) layers.road_major.push(f);
+                    else if (props.highway.match(/secondary|tertiary/)) layers.road_secondary.push(f);
+                    else layers.road_minor.push(f);
+                } 
+                // Sinon, si c'est un bâtiment
+                else if (props.building) {
+                    layers.building.push(f);
+                }
+                // Sinon, si c'est de l'eau
+                else if (props.natural === 'water' || props.waterway === 'river') {
+                     layers.water.push(f);
+                }
+                // Sinon, si c'est une zone
+                else if (props.landuse) {
+                     layers.landuse.push(f); 
                 }
             });
+            
             console.log("Données triées:", {
                 water: layers.water.length,
                 landuse: layers.landuse.length,
+                building: layers.building.length, // Ajouté
                 road_major: layers.road_major.length,
                 road_secondary: layers.road_secondary.length,
                 road_minor: layers.road_minor.length
             });
+
             const drawLayer = (data, style, delay, name) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
@@ -282,47 +325,71 @@
                             resolve();
                             return;
                         }
-                        const group = svg.append("g")
-                            .attr("class", `layer-${name}`);
-                        const paths = group.selectAll("path")
-                            .data(data)
-                            .enter()
-                            .append("path")
-                            .attr("d", pathGenerator)
-                            .attr("class", "layer-fade-in");
-                        if (typeof style === 'function') {
-                            paths.attr("fill", d => style(d).color)
-                                 .attr("fill-opacity", d => style(d).fillOpacity)
-                                 .attr("stroke", "none");
-                        } else if (style.fillOpacity !== undefined) {
-                            paths.attr("fill", style.color)
-                                 .attr("fill-opacity", style.fillOpacity)
-                                 .attr("stroke", "none");
-                        } else {
-                            paths.attr("fill", "none")
-                                 .attr("stroke", style.color)
-                                 .attr("stroke-width", style.weight)
-                                 .attr("stroke-linejoin", "round")
-                                 .attr("stroke-linecap", "round");
-                        }
+                        
+                        L.geoJSON(data, {
+                            style: style, 
+                            onEachFeature: (feature, layer) => {
+                                layer.on('add', () => {
+                                    const element = layer.getElement();
+                                    if (!element) return;
+
+                                    if (name.startsWith('road')) {
+                                        
+                                        element.style.opacity = 0;
+
+                                        setTimeout(() => {
+                                            const length = element.getTotalLength();
+                                            element.style.strokeDasharray = length;
+                                            element.style.strokeDashoffset = length;
+                                            element.classList.add('road-draw-animation');
+                                            element.style.opacity = 1;
+
+                                            element.addEventListener('transitionend', () => {
+                                                element.style.strokeDasharray = 'none';
+                                            }, { once: true });
+
+                                            void element.getBoundingClientRect(); 
+                                            element.style.strokeDashoffset = 0;
+                                        }, 50); 
+
+                                    } else {
+                                        // Animation de fondu pour l'eau, les zones ET les bâtiments
+                                        element.classList.add('layer-fade-in');
+                                    }
+                                });
+                            }
+                        }).addTo(map);
+
                         console.log(`Dessiné: ${data.length} ${name}`);
                         resolve();
                     }, delay);
                 });
             };
+
+            // Séquence de dessin (modifiée)
             try {
                 await drawLayer(layers.water, styles.water, 100, 'water');
-                await drawLayer(layers.landuse, styles.landuse, 400, 'landuse');
-                await drawLayer(layers.road_minor, styles.road_minor, 700, 'road_minor');
-                await drawLayer(layers.road_secondary, styles.road_secondary, 1000, 'road_secondary');
-                await drawLayer(layers.road_major, styles.road_major, 1300, 'road_major');
-                console.log("Visualisation terminée - éléments SVG:", svg.selectAll("path").size());
+                await drawLayer(layers.landuse, styles.landuse, 300, 'landuse');
+                // Ajout des bâtiments (avec animation de fondu)
+                await drawLayer(layers.building, styles.building, 600, 'building'); 
+                
+                await drawLayer(layers.road_minor, styles.road_minor, 900, 'road_minor');
+                await drawLayer(layers.road_secondary, styles.road_secondary, 1300, 'road_secondary');
+                await drawLayer(layers.road_major, styles.road_major, 1700, 'road_major');
+                
+                console.log("Visualisation terminée");
+
+                L.control.zoom().addTo(map);
+                map.dragging.enable();
+                map.touchZoom.enable();
+                map.doubleClickZoom.enable();
+                map.scrollWheelZoom.enable();
+
             } catch (error) {
                 console.error("Erreur lors du dessin:", error);
             }
         }
 
-        // ... [La fonction addBackButton reste identique] ...
         function addBackButton() {
             const backButton = document.createElement('button');
             backButton.textContent = 'Nouvelle recherche';
@@ -340,7 +407,10 @@
             backButton.addEventListener('click', () => {
                 canvasElement.style.opacity = '0';
                 searchContainer.classList.remove('hidden');
-                if (svg) svg.selectAll("*").remove();
+                if (map) {
+                    map.remove();
+                    map = null;
+                }
             });
             
             document.body.appendChild(backButton);
@@ -349,3 +419,4 @@
     </script>
 </body>
 </html>
+
