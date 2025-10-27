@@ -20,13 +20,8 @@
             --loader-bg: rgba(26, 26, 26, 0.95);
         }
 
-        /* Réinitialisation de base */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        /* ... [Le reste de votre CSS reste identique] ... */
+        
         html, body {
             height: 100%;
             width: 100%;
@@ -47,150 +42,38 @@
             transition: opacity 0.5s ease-out;
         }
 
-        #search-container h1 {
-            font-weight: 500;
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        #search-container p {
-            font-weight: 300;
-            font-size: 1.1rem;
-            color: var(--text-secondary);
-            margin-bottom: 2rem;
-        }
-
-        #city-form {
-            width: 100%;
-            max-width: 500px;
-            display: flex;
-        }
-
-        #city-input {
-            flex-grow: 1;
-            font-size: 1.2rem;
-            padding: 0.75rem 1rem;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px 0 0 8px;
-            font-family: 'Inter', sans-serif;
-            font-weight: 300;
-            outline: none;
-            transition: border-color 0.3s, box-shadow 0.3s;
-        }
-
-        #city-input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
-        }
-
-        #city-form button {
-            font-size: 1.2rem;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            background-color: var(--accent);
-            color: white;
-            cursor: pointer;
-            border-radius: 0 8px 8px 0;
-            transition: background-color 0.3s;
-        }
-
-        #city-form button:hover {
-            background-color: #0056b3;
-        }
+        #search-container h1 { font-weight: 500; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        #search-container p { font-weight: 300; font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem; }
+        #city-form { width: 100%; max-width: 500px; display: flex; }
+        #city-input { flex-grow: 1; font-size: 1.2rem; padding: 0.75rem 1rem; border: 1px solid #e0e0e0; border-radius: 8px 0 0 8px; font-family: 'Inter', sans-serif; font-weight: 300; outline: none; transition: border-color 0.3s, box-shadow 0.3s; }
+        #city-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1); }
+        #city-form button { font-size: 1.2rem; padding: 0.75rem 1.5rem; border: none; background-color: var(--accent); color: white; cursor: pointer; border-radius: 0 8px 8px 0; transition: background-color 0.3s; }
+        #city-form button:hover { background-color: #0056b3; }
 
         /* --- Étape 2 : Animation de Chargement --- */
-        #loader {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--loader-bg);
-            color: #f0f0f0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.5s ease-in;
-            perspective: 800px; 
-        }
-
-        #loader.visible {
-            opacity: 1;
-            pointer-events: all;
-        }
-
-        /* Loader 3D */
-        .cube-loader {
-            width: 60px;
-            height: 60px;
-            transform-style: preserve-3d;
-            animation: cube-spin 8s infinite linear;
-            margin-bottom: 2.5rem;
-        }
-
-        .cube-face {
-            position: absolute;
-            width: 60px;
-            height: 60px;
-            border: 1px solid var(--accent);
-            background: rgba(0, 122, 255, 0.1);
-            box-shadow: 0 0 15px var(--accent), inset 0 0 10px rgba(0, 122, 255, 0.2);
-        }
-
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--loader-bg); color: #f0f0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10000; opacity: 0; pointer-events: none; transition: opacity 0.5s ease-in; perspective: 800px; }
+        #loader.visible { opacity: 1; pointer-events: all; }
+        .cube-loader { width: 60px; height: 60px; transform-style: preserve-3d; animation: cube-spin 8s infinite linear; margin-bottom: 2.5rem; }
+        .cube-face { position: absolute; width: 60px; height: 60px; border: 1px solid var(--accent); background: rgba(0, 122, 255, 0.1); box-shadow: 0 0 15px var(--accent), inset 0 0 10px rgba(0, 122, 255, 0.2); }
         .face-front  { transform: rotateY(0deg) translateZ(30px); }
         .face-back   { transform: rotateY(180deg) translateZ(30px); }
         .face-left   { transform: rotateY(-90deg) translateZ(30px); }
         .face-right  { transform: rotateY(90deg) translateZ(30px); }
         .face-top    { transform: rotateX(90deg) translateZ(30px); }
         .face-bottom { transform: rotateX(-90deg) translateZ(30px); }
-
-        @keyframes cube-spin {
-            from { transform: rotateX(0deg) rotateY(0deg); }
-            to   { transform: rotateX(360deg) rotateY(360deg); }
-        }
-
-        #loader p {
-            font-size: 1.1rem;
-            font-weight: 300;
-        }
-
-        #loader-status {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-top: 0.5rem;
-            min-height: 1.2rem; 
-        }
-        
-        #error-message {
-            color: #ff6b6b;
-            margin-top: 1rem;
-            max-width: 400px;
-            text-align: center;
-        }
+        @keyframes cube-spin { from { transform: rotateX(0deg) rotateY(0deg); } to { transform: rotateX(360deg) rotateY(360deg); } }
+        #loader p { font-size: 1.1rem; font-weight: 300; }
+        #loader-status { font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem; min-height: 1.2rem; }
+        #error-message { color: #ff6b6b; margin-top: 1rem; max-width: 400px; text-align: center; }
 
         /* --- Étape 3 : La Carte --- */
-        #map {
-            width: 100%;
-            height: 100vh;
-            background-color: var(--background);
-            z-index: 1;
-            opacity: 0; /* Commence caché */
-            transition: opacity 0.5s ease-in;
-        }
+        #map { width: 100%; height: 100vh; background-color: #f8f8f8; /* MODIFIÉ: Fond légèrement gris pour voir si le div s'affiche */ z-index: 1; opacity: 0; transition: opacity 0.5s ease-in; }
+        .layer-fade-in { animation: fadeIn 1.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        .layer-fade-in {
-            animation: fadeIn 1.5s ease-out forwards;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
+        /* NOUVEAU: Style pour le fond de carte de diagnostic */
+        .carto-light-tile { filter: grayscale(100%) brightness(1.1) contrast(0.9); }
+        
     </style>
 </head>
 <body>
@@ -220,12 +103,10 @@
 
     <div id="map"></div>
 
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
     <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
-
 
     <script>
         // Références DOM
@@ -237,52 +118,26 @@
         const errorMessage = document.getElementById('error-message');
         const mapElement = document.getElementById('map');
 
-        let map; // Variable globale pour la carte Leaflet
+        let map; // Variable globale
 
-        // Définition des styles pour les couches
+        // Styles des couches
         const styles = {
-            water: {
-                color: '#a0c4ff',
-                weight: 0,
-                fillOpacity: 0.8
-            },
-            road_major: {
-                color: '#333',
-                weight: 2.5
-            },
-            road_secondary: {
-                color: '#777',
-                weight: 1.5
-            },
-            road_minor: {
-                color: '#bbb',
-                weight: 0.7
-            },
+            water: { color: '#a0c4ff', weight: 0, fillOpacity: 0.8 },
+            road_major: { color: '#333', weight: 2.5 },
+            road_secondary: { color: '#777', weight: 1.5 },
+            road_minor: { color: '#bbb', weight: 0.7 },
             landuse: (feature) => {
-                let color = '#f0f0f0'; // Couleur par défaut (autres)
+                let color = '#f0f0f0';
                 switch (feature.properties.landuse) {
-                    case 'residential': 
-                        color = '#e6f5d0'; break; // Vert pâle
-                    case 'commercial':  
-                    case 'retail':      
-                        color = '#fbe8d5'; break; // Orange pâle
-                    case 'industrial':  
-                        color = '#e0e0e0'; break; // Gris
-                    case 'forest':
-                    case 'park':
-                    case 'grass':
-                    case 'meadow':
-                        color = '#d9f0d9'; break; // Vert nature
+                    case 'residential': color = '#e6f5d0'; break;
+                    case 'commercial': case 'retail': color = '#fbe8d5'; break;
+                    case 'industrial': color = '#e0e0e0'; break;
+                    case 'forest': case 'park': case 'grass': case 'meadow': color = '#d9f0d9'; break;
                 }
-                return {
-                    color: color,
-                    weight: 0,
-                    fillOpacity: 0.6
-                };
+                return { color: color, weight: 0, fillOpacity: 0.6 };
             }
         };
 
-        // Écouteur d'événement sur le formulaire
         cityForm.addEventListener('submit', startAnalysis);
 
         async function startAnalysis(e) {
@@ -305,15 +160,20 @@
                 updateLoaderStatus('Conversion des données (osmtogeojson)...');
                 const geojsonData = osmtogeojson(overpassData);
 
+                // NOUVEAU (DIAGNOSTIC n°2): Vérifions les données
+                console.log('Données GeoJSON converties:', geojsonData);
+                if (!geojsonData.features || geojsonData.features.length === 0) {
+                    console.warn("Avertissement: La requête Overpass n'a retourné aucune donnée (features).");
+                }
+
                 updateLoaderStatus('Initialisation de la carte...');
                 loader.classList.remove('visible');
                 mapElement.style.opacity = '1';
 
                 initializeMap(geoData.lat, geoData.lon, geoData.bbox);
-                await drawMapLayers(geojsonData); // C'est ici que l'erreur se produisait
+                await drawMapLayers(geojsonData);
                 
             } catch (error) {
-                // C'est ici que votre erreur s'affichait (ligne ~302)
                 console.error('Erreur dans le processus d\'analyse:', error);
                 errorMessage.textContent = `Erreur : ${error.message}. La zone est peut-être trop grande ou l'API a échoué. Veuillez réessayer.`;
                 
@@ -329,123 +189,89 @@
             loaderStatus.textContent = message;
         }
 
-        // Étape 2 : Géocodage avec Nominatim
         async function getBoundingBox(cityName) {
             const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1`;
-            
-            const response = await fetch(url, {
-                headers: { 'Accept': 'application/json' }
-            });
-
-            if (!response.ok) {
-                throw new Error('Le service de géocodage (Nominatim) a échoué.');
-            }
-
+            const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!response.ok) throw new Error('Le service de géocodage (Nominatim) a échoué.');
             const data = await response.json();
-
-            if (!data || data.length === 0) {
-                throw new Error(`Ville non trouvée : "${cityName}"`);
-            }
-
+            if (!data || data.length === 0) throw new Error(`Ville non trouvée : "${cityName}"`);
             const result = data[0];
-            return {
-                bbox: result.boundingbox,
-                lat: parseFloat(result.lat),
-                lon: parseFloat(result.lon)
-            };
+            return { bbox: result.boundingbox, lat: parseFloat(result.lat), lon: parseFloat(result.lon) };
         }
 
-        // Étape 3 : Requête Overpass
         async function getOverpassData(bbox) {
             const bboxString = `(${bbox[0]},${bbox[2]},${bbox[1]},${bbox[3]})`;
             const query = `
                 [out:json][timeout:45]; 
                 (
-                    // 1. Eau
-                    (
-                        way["natural"="water"]${bboxString};
-                        relation["natural"="water"]${bboxString};
-                        way["waterway"="river"]${bboxString};
-                    );
-                    
-                    // 2. Routes
+                    ( way["natural"="water"]${bboxString}; relation["natural"="water"]${bboxString}; way["waterway"="river"]${bboxString}; );
                     way["highway"~"motorway|primary|trunk"]${bboxString};
                     way["highway"~"secondary|tertiary"]${bboxString};
                     way["highway"~"residential|unclassified|service"]${bboxString};
-                    
-                    // 3. Zones (Landuse)
-                    (
-                        way["landuse"~"residential|commercial|industrial|retail|park|forest|grass|meadow"]${bboxString};
-                        relation["landuse"~"residential|commercial|industrial|retail|park|forest|grass|meadow"]${bboxString};
-                    );
+                    ( way["landuse"~"residential|commercial|industrial|retail|park|forest|grass|meadow"]${bboxString}; relation["landuse"~"residential|commercial|industrial|retail|park|forest|grass|meadow"]${bboxString}; );
                 );
                 out geom; 
             `;
-
             const url = 'https://overpass-api.de/api/interpreter';
-            const response = await fetch(url, {
-                method: 'POST',
-                body: `data=${encodeURIComponent(query)}`
-            });
-
-            if (!response.ok) {
-                throw new Error(`L'API Overpass a retourné une erreur (${response.status}). La zone est peut-être trop grande.`);
-            }
-            
+            const response = await fetch(url, { method: 'POST', body: `data=${encodeURIComponent(query)}` });
+            if (!response.ok) throw new Error(`L'API Overpass a retourné une erreur (${response.status}).`);
             return await response.json();
         }
 
-        // Étape 5.1 : Initialiser la carte
+        // --- FONCTION MODIFIÉE ---
         function initializeMap(lat, lon, bbox) {
             if (map) { 
                 map.remove();
             }
             
             map = L.map('map', {
-                zoomControl: false, // On le garde à false ici
+                zoomControl: false, 
                 attributionControl: false 
             });
+
+            // NOUVEAU (DIAGNOSTIC n°1): Ajout d'un fond de carte épuré
+            // Cela nous permet de voir si la carte elle-même se charge.
+            // Si vous préférez un fond blanc pur, commentez cette ligne.
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                maxZoom: 19,
+                className: 'carto-light-tile' // Classe CSS pour le style (voir CSS)
+            }).addTo(map);
 
             map.fitBounds([
                 [bbox[0], bbox[2]], // Sud-Ouest
                 [bbox[1], bbox[3]]  // Nord-Est
             ]);
 
-            L.control.attribution({
-                prefix: 'Données &copy; OpenStreetMap'
-            }).addTo(map);
+            L.control.attribution({ prefix: 'Données &copy; OpenStreetMap' }).addTo(map);
+
+            // NOUVEAU (LA CORRECTION n°1): Force Leaflet à recalculer sa taille
+            // Doit être appelé APRÈS que le conteneur soit visible.
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 100); // Un léger délai pour assurer que le DOM est à jour
         }
 
-        // Étape 5.2 : Dessiner les couches en séquence
+        // --- FONCTION (LÉGÈREMENT MODIFIÉE) ---
         async function drawMapLayers(geojsonData) {
-            const features = geojsonData.features;
+            // Si aucune donnée n'est renvoyée, ne rien faire
+            if (!geojsonData || !geojsonData.features || geojsonData.features.length === 0) {
+                return; // Quitte la fonction
+            }
 
-            const layers = {
-                water: [],
-                road_major: [],
-                road_secondary: [],
-                road_minor: [],
-                landuse: []
-            };
+            const layers = { water: [], road_major: [], road_secondary: [], road_minor: [], landuse: [] };
 
-            features.forEach(f => {
+            geojsonData.features.forEach(f => {
                 const props = f.properties;
-                if (props.natural === 'water' || props.waterway === 'river') {
-                    layers.water.push(f);
-                } else if (props.landuse) {
-                    layers.landuse.push(f); 
-                } else if (props.highway) {
-                    if (props.highway.match(/motorway|primary|trunk/)) {
-                        layers.road_major.push(f);
-                    } else if (props.highway.match(/secondary|tertiary/)) {
-                        layers.road_secondary.push(f);
-                    } else {
-                        layers.road_minor.push(f);
-                    }
+                if (props.natural === 'water' || props.waterway === 'river') layers.water.push(f);
+                else if (props.landuse) layers.landuse.push(f); 
+                else if (props.highway) {
+                    if (props.highway.match(/motorway|primary|trunk/)) layers.road_major.push(f);
+                    else if (props.highway.match(/secondary|tertiary/)) layers.road_secondary.push(f);
+                    else layers.road_minor.push(f);
                 }
             });
 
-            // Fonction utilitaire pour ajouter une couche avec un délai
             const addLayer = (data, style, delay) => {
                 return new Promise(resolve => {
                     setTimeout(() => {
@@ -454,9 +280,7 @@
                             onEachFeature: (feature, layer) => {
                                 layer.on('add', () => {
                                     const element = layer.getElement();
-                                    if (element) {
-                                        element.classList.add('layer-fade-in');
-                                    }
+                                    if (element) element.classList.add('layer-fade-in');
                                 });
                             }
                         }).addTo(map);
@@ -465,36 +289,22 @@
                 });
             };
 
-            // La Séquence de "Dessin"
+            // Séquence de dessin
             await addLayer(layers.water, styles.water, 100);
-            updateLoaderStatus('Dessin des cours d\'eau...');
-
             await addLayer(layers.road_major, styles.road_major, 800);
-            updateLoaderStatus('Tracé des axes majeurs...');
-
             await addLayer(layers.road_secondary, styles.road_secondary, 600);
-            updateLoaderStatus('Tracé du réseau secondaire...');
-
             await addLayer(layers.road_minor, styles.road_minor, 600);
-            updateLoaderStatus('Finalisation du réseau routier...');
-
             await addLayer(layers.landuse, styles.landuse, 800);
-            updateLoaderStatus('Identification des zones...');
             
             updateLoaderStatus('Analyse terminée.');
             
-            // --- C'EST LA CORRECTION ---
-            // Au lieu de map.zoomControl.addTo(map)
-            L.control.zoom().addTo(map); // On crée un nouveau contrôle de zoom
-            // ---------------------------
-
-            // Réactiver le drag (le reste était correct)
+            // Réactivation des contrôles
+            L.control.zoom().addTo(map); 
             map.dragging.enable();
             map.touchZoom.enable();
             map.doubleClickZoom.enable();
             map.scrollWheelZoom.enable();
         }
-
     </script>
 </body>
 </html>
