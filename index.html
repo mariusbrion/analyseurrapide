@@ -211,14 +211,17 @@
 
 
         // MODIFIÉ: Accepte 'fitObject' (notre bboxGeoJSON) au lieu de 'geojsonData'
-        function initializeCanvas(fitObject) { 
+       function initializeCanvas(fitObject) { 
             // Nettoie le SVG précédent
             svg = d3.select("#viz-canvas");
             svg.selectAll("*").remove();
 
-            // Dimensions
-            const width = canvasElement.clientWidth;
-            const height = canvasElement.clientHeight;
+            // --- CORRECTION CI-DESSOUS ---
+            // N'utilisez pas clientWidth/clientHeight, qui peuvent être 0
+            // Utilisez la taille de la fenêtre, que le SVG est censé remplir.
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            // --- FIN DE LA CORRECTION ---
             
             svg.attr("width", width)
                .attr("height", height);
@@ -226,9 +229,14 @@
             // Crée une projection centrée sur la ville
             const projection = d3.geoMercator();
             
-            // MODIFIÉ: Utilise fitSize pour adapter la projection à notre 'fitObject' (la bbox)
-            // C'est la correction principale
-            projection.fitSize([width, height], fitObject); 
+            // Ajoute un peu de "padding" (marge) pour que la ville ne touche pas les bords
+            const padding = 20; // 20 pixels de marge
+            
+            // Utilise fitSize pour adapter la projection à notre 'fitObject' (la bbox)
+            projection.fitSize([width - padding * 2, height - padding * 2], fitObject); 
+            
+            // Applique la translation de la marge
+            projection.translate([width / 2, height / 2]);
 
             // Crée le générateur de chemin
             pathGenerator = d3.geoPath().projection(projection);
@@ -238,7 +246,6 @@
             console.log("Projection center:", projection.center());
             console.log("Projection translate:", projection.translate());
         }
-
         // ... [La fonction drawMapLayers reste identique] ...
         async function drawMapLayers(geojsonData) {
             if (!geojsonData?.features?.length) {
